@@ -1,0 +1,113 @@
+volumes:
+  wind_db_data:
+    driver: local
+  kestra_db_data:
+    driver: local
+  kestra_storage:
+    driver: local
+
+services:
+  #Data warehouse
+  pgdatabase:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: med_wind
+    ports:
+      - "5432:5432"
+    volumes:
+      - wind_db_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d med_wind -U root"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+
+  #Database administration UI 
+  pgadmin:
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: root
+    ports:
+      - "8085:80"
+    depends_on:
+      pgdatabase:
+        condition: service_healthy
+      kestra:
+        condition: service_healthy
+
+  #Kestra internal engine database
+  kestra_postgres:
+    image: postgres:18
+    volumes:
+      - kestra_db_data:/var/lib/postgresql
+    environment:
+      POSTGRES_DB: kestra
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+  
+  kestra:
+    image: kestra/kestra:v1.1
+    pull_policy: always
+    user: "root"
+    command: server standalone
+    volumes:
+      - kestra_storage:/app/storage
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/tmp/kestra-wd:/tmp/kestra-wd
+      - /workspaces/mediterranean-offshore-wind-pipeline/keys/google_credentials.json
+    
+    env_file:
+      - .env
+    environment:
+      KESTRA_CONFIGURATION: |
+        datasources:
+          postgres:
+            url: jdbc:postgresql://kestra_postgres:5432/kestra
+            driverClassName: org.postgresql.Driver
+            username: admin
+            password: admin
+        kestra:
+          secret:
+            type: TYPESAFE
+          server:
+            basicAuth:
+              username: "admin@wind.com"
+              password: Admin1234!
+          repository:
+            type: postgres
+          storage:
+            type: local
+            local:
+              base-path: /app/storage
+          queue:
+            type: postgres
+          ai:
+            type: gemini
+            gemini:
+              model-name: gemini-3-flash
+              api-key: ${GEMINI_API_KEY}
+          tasks:
+            tmpDir:
+              path: /tmp/kestra-wd-tmp
+          url: http://localhost:8080
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    depends_on:
+      kestra_postgres:
+        condition: service_started

@@ -1,0 +1,7 @@
+copernicusmarine
+pandas
+pyarrow
+fastparquet
+xarray
+netCDF4
+dbt-bigquery

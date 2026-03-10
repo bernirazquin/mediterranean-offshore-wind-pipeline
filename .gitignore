@@ -35,6 +35,13 @@ data/*
 *.tfvars
 *.tfvars.json
 
+# === Docker & Databases ===
+postgres_data/
+kestra_storage/
+kestra_db_data/
+wind_db_data/
+storage/
+
 # === Cloud & Security ===
 keys/
 *.json

@@ -68,6 +68,12 @@ services:
     env_file:
       - .env
     environment:
+      
+      ENV_GCP_SERVICE_ACCOUNT_B64: ${GCP_SERVICE_ACCOUNT_B64}
+      ENV_GCS_BUCKET: ${GCS_BUCKET}
+      ENV_GCP_PROJECT_ID: ${GCP_PROJECT_ID}
+      ENV_GEMINI_API_KEY: ${GEMINI_API_KEY}
+      
       KESTRA_CONFIGURATION: |
         datasources:
           postgres:

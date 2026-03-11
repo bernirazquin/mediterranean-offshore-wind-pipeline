@@ -1,0 +1,179 @@
+id: wave_data_ingestion
+namespace: company.wind
+
+description: |
+  Fetches hourly wave data from Open-Meteo Marine ERA5-Ocean API for a given site and date range.
+  Flattens response to NDJSON, uploads to GCS data lake, and loads to BigQuery.
+  Uses ERA5-Ocean model for full Mediterranean historical coverage from 2006.
+
+labels:
+  type: ingestion
+  env: prod
+  source: open-meteo-marine
+
+inputs:
+  - id: site
+    type: SELECT
+    displayName: "Select Mediterranean basin"
+    values:
+      - "ALBORAN_SEA"
+      - "GULF_OF_VALENCIA"
+      - "EBRO_DELTA"
+      - "COSTA_BRAVA"
+      - "GULF_OF_LYON"
+      - "BALEARIC_SEA"
+      - "TYRRHENIAN_SEA"
+      - "STRAIT_OF_SICILY"
+      - "NORTH_ADRIATIC_SEA"
+      - "IONIAN_SEA"
+      - "AEGEAN_SEA"
+      - "LIBYAN_COAST"
+      - "LEVANTINE_SEA"
+      - "CYPRUS_COAST"
+    defaults: "GULF_OF_LYON"
+
+  - id: start_date
+    type: DATE
+    defaults: "2023-01-01"
+
+  - id: end_date
+    type: DATE
+    defaults: "2023-01-02"
+
+tasks:
+  - id: get_coordinates
+    type: io.kestra.plugin.core.kv.Get
+    key: "{{ inputs.site }}"
+    namespace: company.wind
+
+  - id: decode_credentials
+    type: io.kestra.plugin.scripts.python.Script
+    containerImage: python:3.11-slim
+    taskRunner:
+      type: io.kestra.plugin.scripts.runner.docker.Docker
+    outputFiles:
+      - "sa.json"
+    script: |
+      import base64
+      decoded = base64.b64decode("{{ envs.gcp_service_account_b64 }}").decode("utf-8")
+      with open("sa.json", "w") as f:
+          f.write(decoded)
+      print("✅ Credentials decoded")
+
+  - id: download_wave_data
+    type: io.kestra.plugin.core.http.Download
+    uri: "https://marine-api.open-meteo.com/v1/marine?latitude={{ outputs.get_coordinates.value.lat }}&longitude={{ outputs.get_coordinates.value.lon }}&start_date={{ inputs.start_date }}&end_date={{ inputs.end_date }}&hourly=wave_height,wave_direction,wave_period&models=era5_ocean&format=json"
+    retry:
+      type: constant
+      interval: PT30S
+      maxAttempt: 3
+
+  - id: flatten_to_ndjson
+    type: io.kestra.plugin.scripts.python.Script
+    containerImage: python:3.11-slim
+    taskRunner:
+      type: io.kestra.plugin.scripts.runner.docker.Docker
+    outputFiles:
+      - "wave.ndjson"
+    script: |
+      import json
+      import math
+
+      def nan_to_none(v):
+          try:
+              return None if math.isnan(float(v)) else float(v)
+          except:
+              return None
+
+      with open("{{ outputs.download_wave_data.uri }}", "r") as f:
+          data = json.load(f)
+
+      hourly = data["hourly"]
+      site   = "{{ inputs.site }}"
+      lat    = data["latitude"]
+      lon    = data["longitude"]
+
+      with open("wave.ndjson", "w") as out:
+          for i, ts in enumerate(hourly["time"]):
+              row = {
+                  "location_name":    site,
+                  "latitude":         lat,
+                  "longitude":        lon,
+                  "observation_time": ts + ":00",
+                  "wave_height":      nan_to_none(hourly["wave_height"][i]),
+                  "wave_direction":   nan_to_none(hourly["wave_direction"][i]),
+                  "wave_period":      nan_to_none(hourly["wave_period"][i]),
+              }
+              out.write(json.dumps(row) + "\n")
+
+      print(f"✅ {len(hourly['time'])} wave rows for {site}")
+
+  - id: upload_wave_to_gcs
+    type: io.kestra.plugin.gcp.gcs.Upload
+    from: "{{ outputs.flatten_to_ndjson.outputFiles['wave.ndjson'] }}"
+    to: "gs://{{ envs.gcs_bucket }}/raw/wave/{{ inputs.site }}/{{ inputs.start_date }}_{{ inputs.end_date }}.ndjson"
+    serviceAccount: "{{ read(outputs.decode_credentials.outputFiles['sa.json']) }}"
+    retry:
+      type: constant
+      interval: PT30S
+      maxAttempt: 3
+
+  - id: load_wave_to_bigquery
+    type: io.kestra.plugin.gcp.bigquery.LoadFromGcs
+    serviceAccount: "{{ read(outputs.decode_credentials.outputFiles['sa.json']) }}"
+    projectId: "{{ envs.gcp_project_id }}"
+    destinationTable: "{{ envs.gcp_project_id }}.med_wind_prod.raw_wave_data"
+    from:
+      - "gs://{{ envs.gcs_bucket }}/raw/wave/{{ inputs.site }}/{{ inputs.start_date }}_{{ inputs.end_date }}.ndjson"
+    format: JSON
+    writeDisposition: WRITE_APPEND
+    createDisposition: CREATE_IF_NEEDED
+    timePartitioningType: MONTH
+    timePartitioningField: observation_time
+    clusteringFields:
+      - location_name
+    schema:
+      fields:
+        - name: location_name
+          type: STRING
+        - name: latitude
+          type: FLOAT64
+        - name: longitude
+          type: FLOAT64
+        - name: observation_time
+          type: TIMESTAMP
+        - name: wave_height
+          type: FLOAT64
+        - name: wave_direction
+          type: FLOAT64
+        - name: wave_period
+          type: FLOAT64
+    retry:
+      type: constant
+      interval: PT30S
+      maxAttempt: 3
+
+  - id: validate_row_count
+    type: io.kestra.plugin.gcp.bigquery.Query
+    serviceAccount: "{{ read(outputs.decode_credentials.outputFiles['sa.json']) }}"
+    projectId: "{{ envs.gcp_project_id }}"
+    sql: |
+      DECLARE row_count INT64;
+      SET row_count = (
+        SELECT COUNT(*) 
+        FROM `{{ envs.gcp_project_id }}.med_wind_prod.raw_wave_data`
+        WHERE location_name = '{{ inputs.site }}'
+        AND DATE(observation_time) BETWEEN '{{ inputs.start_date }}' AND '{{ inputs.end_date }}'
+      );
+      IF row_count = 0 THEN
+        RAISE USING MESSAGE = 'No rows loaded for {{ inputs.site }}: ' || CAST(row_count AS STRING);
+      END IF;
+
+  - id: log_completion
+    type: io.kestra.plugin.core.log.Log
+    message: "✅ Wave loaded for {{ inputs.site }} ({{ inputs.start_date }} → {{ inputs.end_date }})"
+
+errors:
+  - id: alert_on_failure
+    type: io.kestra.plugin.core.log.Log
+    message: "❌ Wave ingestion failed for {{ inputs.site }} ({{ inputs.start_date }} → {{ inputs.end_date }})"

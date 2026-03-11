@@ -1,0 +1,84 @@
+id: site_data_ingestion
+namespace: company.wind
+
+description: |
+  Parent flow that fetches wind and wave data in parallel for a given site and date range.
+  Called by site_data_backfill for historical loads and can be run manually for ad-hoc ingestion.
+  Wind data sourced from Open-Meteo ERA5 Archive API, wave data from Open-Meteo Marine API.
+
+labels:
+  type: ingestion
+  env: prod
+
+inputs:
+  - id: site
+    type: SELECT
+    displayName: "Select Mediterranean basin"
+    values:
+      - "ALBORAN_SEA"
+      - "GULF_OF_VALENCIA"
+      - "EBRO_DELTA"
+      - "COSTA_BRAVA"
+      - "GULF_OF_LYON"
+      - "BALEARIC_SEA"
+      - "TYRRHENIAN_SEA"
+      - "STRAIT_OF_SICILY"
+      - "NORTH_ADRIATIC_SEA"
+      - "IONIAN_SEA"
+      - "AEGEAN_SEA"
+      - "LIBYAN_COAST"
+      - "LEVANTINE_SEA"
+      - "CYPRUS_COAST"
+    defaults: "GULF_OF_LYON"
+
+  - id: start_date
+    type: DATE
+    defaults: "2023-01-01"
+
+  - id: end_date
+    type: DATE
+    defaults: "2023-01-02"
+
+tasks:
+  - id: fetch_wind_and_wave
+    type: io.kestra.plugin.core.flow.Parallel
+    tasks:
+      - id: wind
+        type: io.kestra.plugin.core.flow.Subflow
+        flowId: wind_data_ingestion
+        namespace: company.wind
+        inputs:
+          site: "{{ inputs.site }}"
+          start_date: "{{ inputs.start_date }}"
+          end_date: "{{ inputs.end_date }}"
+        wait: true
+        transmitFailed: true
+        retry:
+          type: constant
+          interval: PT30S
+          maxAttempt: 3
+
+      - id: wave
+        type: io.kestra.plugin.core.flow.Subflow
+        flowId: wave_data_ingestion
+        namespace: company.wind
+        inputs:
+          site: "{{ inputs.site }}"
+          start_date: "{{ inputs.start_date }}"
+          end_date: "{{ inputs.end_date }}"
+        wait: true
+        transmitFailed: true
+        allowFailure: true
+        retry:
+          type: constant
+          interval: PT30S
+          maxAttempt: 3
+
+  - id: log_completion
+    type: io.kestra.plugin.core.log.Log
+    message: "✅ Wind + wave complete for {{ inputs.site }} ({{ inputs.start_date }} → {{ inputs.end_date }})"
+
+errors:
+  - id: alert_on_failure
+    type: io.kestra.plugin.core.log.Log
+    message: "❌ site_data_ingestion failed for {{ inputs.site }} ({{ inputs.start_date }} → {{ inputs.end_date }})"

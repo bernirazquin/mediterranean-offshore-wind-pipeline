@@ -1,0 +1,33 @@
+id: site_key_values
+namespace: company.wind
+
+description: "Populate Kestra KV Store with Mediterranean coordinates"
+
+tasks:
+  - id: populate_kv_store
+    type: io.kestra.plugin.core.flow.EachSequential
+    value:
+      - '{"key": "ALBORAN_SEA", "lat": 36.0, "lon": -4.0}'
+      - '{"key": "GULF_OF_VALENCIA", "lat": 39.5, "lon": -0.1}'
+      - '{"key": "EBRO_DELTA", "lat": 40.7, "lon": 0.9}'
+      - '{"key": "COSTA_BRAVA", "lat": 42.1, "lon": 3.3}'
+      - '{"key": "GULF_OF_LYON", "lat": 43.0, "lon": 4.0}'
+      - '{"key": "BALEARIC_SEA", "lat": 39.0, "lon": 2.5}'
+      - '{"key": "TYRRHENIAN_SEA", "lat": 40.0, "lon": 12.0}'
+      - '{"key": "STRAIT_OF_SICILY", "lat": 37.0, "lon": 11.5}'
+      - '{"key": "NORTH_ADRIATIC_SEA", "lat": 44.5, "lon": 13.0}'
+      - '{"key": "IONIAN_SEA", "lat": 38.0, "lon": 18.0}'
+      - '{"key": "AEGEAN_SEA", "lat": 37.5, "lon": 25.0}'
+      - '{"key": "LIBYAN_COAST", "lat": 33.0, "lon": 20.0}'
+      - '{"key": "LEVANTINE_SEA", "lat": 34.0, "lon": 34.0}'
+      - '{"key": "CYPRUS_COAST", "lat": 35.0, "lon": 34.0}'
+    tasks:
+      - id: set_kv
+        type: io.kestra.plugin.core.kv.Set
+        key: "{{ taskrun.value | jq('.key') | first }}"
+        value: "{{ taskrun.value | jq('{lat: .lat, lon: .lon}') | first }}"
+        namespace: company.wind
+
+  - id: log_completion
+    type: io.kestra.plugin.core.log.Log
+    message: "KV Store successfully populated."

@@ -82,6 +82,7 @@ services:
             username: admin
             password: admin
         kestra:
+          tutorial-enabled: false
           secret:
             type: TYPESAFE
           server:

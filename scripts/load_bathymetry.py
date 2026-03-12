@@ -20,3 +20,56 @@ SITES = {
     "CYPRUS_COAST":       (35.0, 34.0),
 }
 
+'''
+Tiles download bounding Mediterranean, using ETOPO2022 15s resolution dataset from NOAA NGDC 
+via OpenDAP avoiding the need to download the entire global dataset. 
+
+The get_depth function iterates through the tiles, trying to find the depth at the specified latitude and 
+longitude by selecting the nearest point in the dataset. 
+ 
+If a tile does not contain the requested location, it continues to the next tile until it finds a match or exhausts all options
+'''
+
+TILES = [
+    "https://www.ngdc.noaa.gov/thredds/dodsC/global/ETOPO2022/15s/15s_surface_elev_netcdf/ETOPO_2022_v1_15s_N30W015_surface.nc",
+    "https://www.ngdc.noaa.gov/thredds/dodsC/global/ETOPO2022/15s/15s_surface_elev_netcdf/ETOPO_2022_v1_15s_N30E000_surface.nc",
+    "https://www.ngdc.noaa.gov/thredds/dodsC/global/ETOPO2022/15s/15s_surface_elev_netcdf/ETOPO_2022_v1_15s_N30E015_surface.nc",
+    "https://www.ngdc.noaa.gov/thredds/dodsC/global/ETOPO2022/15s/15s_surface_elev_netcdf/ETOPO_2022_v1_15s_N30E030_surface.nc",
+]
+
+
+def get_depth(lat, lon):
+    for url in TILES:
+        try:
+            ds = xr.open_dataset(url)
+            depth = float(ds["z"].sel(lat=lat, lon=lon, method="nearest").values)
+            ds.close()
+            return depth
+        except:
+            continue
+    raise ValueError(f"No tile found for ({lat}, {lon})")
+
+def main ():
+    print ("Connecting to ETOPO 2022 via OpeNDAP...")
+    rows = []
+    for site, (lat, lon) in SITES.items():
+        depth = get_depth(lat, lon)
+        rows.append({
+            "location_name":   site,
+            "latitude":        lat,
+            "longitude":       lon,
+            "depth_m":         depth,
+            "depth_category":  (
+                "shallow"      if depth > -50  else
+                "transitional" if depth > -200 else
+                "deep"
+            ),
+            "viable_fixed":    depth >= -50,
+            "viable_floating": depth >= -200,
+        })
+        print (f"Retrieved depth for {site}: {depth:0.f} m")
+
+df = pd.DataFrame(rows)
+print ("\n Results:")
+print (df[["location_name", "latitude", "longitude", "depth_m", "depth_category"]])
+

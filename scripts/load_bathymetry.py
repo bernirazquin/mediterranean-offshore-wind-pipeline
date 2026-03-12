@@ -69,7 +69,20 @@ def main ():
         })
         print (f"Retrieved depth for {site}: {depth:0.f} m")
 
-df = pd.DataFrame(rows)
-print ("\n Results:")
-print (df[["location_name", "latitude", "longitude", "depth_m", "depth_category"]])
+    df = pd.DataFrame(rows)
+    print ("\n Results:")
+    print (df[["location_name", "latitude", "longitude", "depth_m", "depth_category"]])
 
+    print("\n Loading Bigquery...")
+    client = bigquery.Client.from_service_account_json("keys/google_credentials.json")
+    job = client.load_table_from_dataframe(
+        df,
+        "med-offshore-wind-489212.med_wind_prod.ref_bathymetry",
+        job_config=bigquery.LoadJobConfig(write_disposition="WRITE_TRUNCATE")
+        )
+    job.result()
+    print("✅ Cargado a BigQuery: med_wind_prod.ref_bathymetry")
+
+
+if __name__ == "__main__":
+    main()

@@ -106,6 +106,7 @@ requests-oauthlib==2.0.0
 rpds-py==0.30.0
 rsa==4.9.1
 s3transfer==0.16.0
+scipy==1.17.1
 semver==3.0.4
 shapely==2.1.2
 six==1.17.0

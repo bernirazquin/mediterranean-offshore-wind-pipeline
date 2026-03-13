@@ -1,4 +1,3 @@
-cat > models/staging/sources.yml << 'EOF'
 version: 2
 
 sources:
@@ -11,4 +10,3 @@ sources:
       - name: raw_wave_data
       - name: raw_bathymetry
       - name: raw_coastline_distance
-EOF

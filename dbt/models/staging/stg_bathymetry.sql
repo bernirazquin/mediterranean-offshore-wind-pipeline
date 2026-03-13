@@ -1,4 +1,3 @@
-cat > models/staging/stg_bathymetry.sql << 'EOF'
 -- Staging model for bathymetry data
 -- Filters to marine cells only and adds depth category
 -- Source: ETOPO 2022 (NOAA), resolution ~450m, WGS84
@@ -24,4 +23,3 @@ select
 
 from {{ source('med_wind_prod', 'raw_bathymetry') }}
 where elevation_m < 0  -- marine cells only
-EOF

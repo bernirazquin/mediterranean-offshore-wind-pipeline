@@ -1,4 +1,3 @@
-cat > models/staging/stg_coastline_distance.sql << 'EOF'
 -- Staging model for coastline distance data
 -- Filters out land cells via inner join with bathymetry
 -- Source: Natural Earth 1:10m coastline, scipy distance transform, WGS84
@@ -21,4 +20,3 @@ from {{ source('med_wind_prod', 'raw_coastline_distance') }} c
 inner join {{ source('med_wind_prod', 'raw_bathymetry') }} b
     on round(c.latitude,  3) = round(b.latitude,  3)
     and round(c.longitude, 3) = round(b.longitude, 3)
-EOF

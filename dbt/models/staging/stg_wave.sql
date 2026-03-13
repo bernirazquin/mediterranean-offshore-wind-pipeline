@@ -1,4 +1,3 @@
-cat > models/staging/stg_wave.sql << 'EOF'
 -- Staging model for raw wave data
 -- Selects and renames columns from raw_wave_data
 -- No business logic — just cleaning and standardization
@@ -18,4 +17,3 @@ select
 
 from {{ source('med_wind_prod', 'raw_wave_data') }}
 where wave_height is not null
-EOF

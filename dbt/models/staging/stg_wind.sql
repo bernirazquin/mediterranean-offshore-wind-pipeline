@@ -1,4 +1,3 @@
-cat > models/staging/stg_wind.sql << 'EOF'
 -- Staging model for raw wind data
 -- Selects and renames columns from raw_wind_data
 
@@ -17,4 +16,3 @@ select
 
 from {{ source('med_wind_prod', 'raw_wind_data') }}
 where wind_speed_100m is not null
-EOF

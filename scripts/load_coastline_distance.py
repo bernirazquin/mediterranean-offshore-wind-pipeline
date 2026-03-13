@@ -47,8 +47,15 @@ def main():
     print(f"  {len(gdf)} coastline segments clipped to Mediterranean")
 
     # Rasterize onto ETOPO grid
-    lats   = np.arange(LAT_MIN, LAT_MAX, RESOLUTION)
-    lons   = np.arange(LON_MIN, LON_MAX, RESOLUTION)
+
+                         # IMPORTANT: np.arange starts at the pixel edge (e.g. 30.0) but
+                         # ETOPO/xarray stores coordinates at pixel centers (e.g. 30.002083).
+                         # Adding RESOLUTION/2 shifts the grid origin to pixel centers so
+                         # that lat/lon values in this table align exactly with raw_bathymetry.
+                         # Without this fix, the join in stg_coastline_distance returns 0 rows.
+
+    lats = np.arange(LAT_MIN + RESOLUTION/2, LAT_MAX, RESOLUTION)
+    lons = np.arange(LON_MIN + RESOLUTION/2, LON_MAX, RESOLUTION)
     raster = np.zeros((len(lats), len(lons)), dtype=np.uint8)
 
     for geom in gdf.geometry:

@@ -1,0 +1,32 @@
+# Project name and version — must match the profile name in profiles.yml
+name: 'mediterranean_wind'
+version: '1.0.0'
+profile: 'mediterranean_wind'
+
+# Standard dbt folder structure
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+# Folders removed when running `dbt clean`
+clean-targets:
+  - "target"       # compiled SQL and run artifacts
+  - "dbt_packages" # installed dbt packages
+
+models:
+  mediterranean_wind:
+
+    # Staging models — lightweight views that clean and rename raw source data
+    # One model per raw table, no business logic here
+    staging:
+      +materialized: view        # views are cheap and always up to date
+      +schema: med_wind_prod     # writes to med_wind_prod dataset in BigQuery
+
+    # Core models — final tables with business logic and scoring
+    # Materialized as tables because they are queried by the dashboard
+    core:
+      +materialized: table       # tables are faster to query than views
+      +schema: med_wind_prod     # same dataset, different model prefix

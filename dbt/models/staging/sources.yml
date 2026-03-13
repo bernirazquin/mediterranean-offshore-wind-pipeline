@@ -1,0 +1,14 @@
+cat > models/staging/sources.yml << 'EOF'
+version: 2
+
+sources:
+  - name: med_wind_prod
+    database: med-offshore-wind-489212
+    schema: med_wind_prod
+
+    tables:
+      - name: raw_wind_data
+      - name: raw_wave_data
+      - name: raw_bathymetry
+      - name: raw_coastline_distance
+EOF

@@ -25,6 +25,10 @@ models:
       +materialized: view        # views are cheap and always up to date
       +schema: med_wind_prod     # writes to med_wind_prod dataset in BigQuery
 
+    intermediate:
+      +materialized: view        # views are cheap and always up to date
+      +schema: med_wind_prod     # same dataset, different model prefix 
+
     # Core models — final tables with business logic and scoring
     # Materialized as tables because they are queried by the dashboard
     core:

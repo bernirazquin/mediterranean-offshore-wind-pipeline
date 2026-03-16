@@ -10,3 +10,4 @@ sources:
       - name: raw_wave_data
       - name: raw_bathymetry
       - name: raw_coastline_distance
+      - name: raw_site_boundaries

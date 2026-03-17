@@ -1,0 +1,11 @@
+areas:
+  - name: "gulf_of_lion"
+    description: "Gulf of Lion — northern Mediterranean, site of the EFGL floating offshore wind project"
+    lat_min: 40.5
+    lat_max: 44.0
+    lon_min: 2.5
+    lon_max: 7.0
+    resolution: 0.25
+    depth_min_m: 0
+    depth_max_m: -2000
+    active: true

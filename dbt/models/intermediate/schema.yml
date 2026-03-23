@@ -1,0 +1,93 @@
+version: 2
+
+models:
+
+  - name: int_site_centers
+    description: "111 Gulf of Lion site centroids parsed from wind location keys."
+    columns:
+      - name: site_name
+        data_tests: [unique, not_null]
+      - name: spatial_id
+        data_tests: [unique, not_null]
+
+  - name: int_site_spatial_samples
+    description: "Raw raster aggregation per site grid cell. May contain nulls for unmatched sites."
+    columns:
+      - name: site_name
+        data_tests: [unique, not_null]
+      - name: sample_count
+        description: "Number of high-resolution raster cells matched to this grid point."
+        data_tests: [not_null]
+
+  - name: int_site_spatial_summary
+    description: "One row per site with aggregated depth and distance values. Nulls filtered."
+    columns:
+      - name: site_name
+        data_tests: [unique, not_null]
+      - name: spatial_id
+        data_tests: [unique, not_null]
+      - name: depth_m
+        data_tests: [not_null]
+      - name: distance_to_coast_km
+        data_tests: [not_null]
+
+  - name: int_site_wind_summary
+    description: "One row per site aggregating historical wind statistics."
+    columns:
+      - name: site_id
+        data_tests: [unique, not_null]
+      - name: site_name
+        data_tests: [unique, not_null]
+      - name: avg_wind_speed_ms
+        data_tests: [not_null]
+
+  - name: int_site_spatial_score
+    description: >
+      Spatial scores per site. Single source of truth for depth_score,
+      coast_score, and spatial_score. Only viable turbine sites included.
+    columns:
+      - name: site_name
+        data_tests: [unique, not_null]
+      - name: depth_score
+        data_tests: [not_null]
+      - name: coast_score
+        data_tests: [not_null]
+      - name: spatial_score
+        data_tests: [not_null]
+      - name: turbine_type
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['fixed', 'floating', 'not_viable']
+
+  - name: int_site_wind_score
+    description: >
+      Wind scores per site. Single source of truth for wind_score and
+      wind_potential_class.
+    columns:
+      - name: site_name
+        data_tests: [unique, not_null]
+      - name: wind_score
+        data_tests: [not_null]
+      - name: wind_potential_class
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['high', 'medium', 'low']
+
+  - name: int_site_composite_score
+    description: >
+      Final composite score per site joining spatial (40%) and wind (60%) scores.
+      Inner join means only sites with both data sources are included.
+      This is the only model the mart should read from.
+    columns:
+      - name: site_name
+        data_tests: [unique, not_null]
+      - name: final_score
+        data_tests: [not_null]
+      - name: turbine_type
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['fixed', 'floating']

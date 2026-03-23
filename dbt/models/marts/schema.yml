@@ -1,0 +1,28 @@
+version: 2
+
+models:
+
+  - name: mart_offshore_site_prioritization
+    description: >
+      Final ranked table of viable offshore wind sites.
+      Pure presentation layer — no business logic.
+      All scoring lives in int_site_composite_score.
+      Composite score: spatial 40% + wind 60%.
+    columns:
+      - name: site_rank
+        description: "1 = highest priority site. Derived from final_score via RANK()."
+        data_tests: [unique, not_null]
+      - name: site_name
+        data_tests: [unique, not_null]
+      - name: final_score
+        data_tests: [not_null]
+      - name: turbine_type
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['fixed', 'floating']
+      - name: wind_potential_class
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['high', 'medium', 'low']

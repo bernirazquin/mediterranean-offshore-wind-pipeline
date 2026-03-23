@@ -1,38 +1,78 @@
 version: 2
 
 models:
-  # --- STAGING LAYER: Basic Data Integrity ---
-  - name: stg_wind
-    columns:
-      - name: spatial_id
-        data_tests:
-          - not_null
 
-  - name: stg_bathymetry
+  - name: stg_wind
+    description: "Cleaned wind observations. One row per site x timestamp."
     columns:
+      - name: record_id
+        description: "True primary key: site + timestamp"
+        data_tests: [unique, not_null]
+      - name: site_id
+        description: "Surrogate key derived from location_name."
+        data_tests: [not_null]
       - name: spatial_id
-        data_tests:
-          - not_null
-      - name: depth_m
-        data_tests:
-          - not_null
+        description: "Grid-snapped surrogate key for spatial joins."
+        data_tests: [not_null]
+      - name: location_name
+        data_tests: [not_null]
+      - name: wind_speed_ms
+        data_tests: [not_null]
+      - name: snap_lat
+        data_tests: [not_null]
+      - name: snap_lon
+        data_tests: [not_null]
 
   - name: stg_wave
+    description: "Cleaned wave observations. One row per site x timestamp."
     columns:
+      - name: record_id
+        description: "True primary key: site + timestamp"
+        data_tests: [unique, not_null]
+      - name: site_id
+        description: "Surrogate key derived from location_name."
+        data_tests: [not_null]
       - name: spatial_id
-        data_tests:
-          - not_null
+        description: "Grid-snapped surrogate key for spatial joins."
+        data_tests: [not_null]
+      - name: location_name
+        data_tests: [not_null]
+      - name: wave_height
+        data_tests: [not_null]
+      - name: snap_lat
+        data_tests: [not_null]
+      - name: snap_lon
+        data_tests: [not_null]
 
-  # --- INTERMEDIATE LAYER: Business Logic Integrity ---
-  - name: int_site_spatial_summary
-    description: "One row per unique offshore wind site. This is where we test uniqueness."
+  - name: stg_bathymetry
+    description: "Marine bathymetry cells only (elevation_m < 0). depth_m is always positive."
     columns:
-      - name: site_name
-        data_tests:
-          - unique
-          - not_null
       - name: spatial_id
-        description: "The unique grid cell ID."
+        description: "Grid-snapped surrogate key for spatial joins."
+        data_tests: [not_null]
+      - name: depth_m
+        description: "Positive water depth in metres. abs(elevation_m) from source."
+        data_tests: [not_null]
+      - name: depth_category
         data_tests:
-          - unique
           - not_null
+          - accepted_values:
+              values: ['shallow', 'transitional', 'deep']
+      - name: snap_lat
+        data_tests: [not_null]
+      - name: snap_lon
+        data_tests: [not_null]
+
+  - name: stg_coastline_distance
+    description: "Distance-to-coast per marine raster pixel. Land cells excluded via inner join with bathymetry."
+    columns:
+      - name: spatial_id
+        description: "Grid-snapped surrogate key for spatial joins."
+        data_tests: [not_null]
+      - name: distance_to_coast_km
+        data_tests: [not_null]
+      - name: distance_category
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['nearshore', 'midshore', 'offshore']

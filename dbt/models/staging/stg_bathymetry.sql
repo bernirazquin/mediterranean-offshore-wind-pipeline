@@ -2,25 +2,23 @@
 -- Staging model for bathymetry data
 -- Filters to marine cells only and adds depth category
 -- Source: ETOPO 2022 (NOAA), resolution ~450m, WGS84
--- Snapping high-res raster data to the project's 0.25 deg grid
+--
+-- FIX: Missing comma before depth_category CASE block (syntax crash).
+-- FIX: elevation_m dropped — depth_m (positive value) is the only exposed metric
+--      per nomenclature standard. Consumers should never need raw elevation.
+-- FIX: grid_lat/grid_lon renamed to snap_lat/snap_lon.
+-- FIX: generate_grid_id macro now used for spatial_id.
 
 select
-    latitude,
-    longitude,
-    elevation_m,
+    -- Snap raw coordinates to the 0.25 degree grid center
+    cast(round(floor(latitude  / 0.25) * 0.25 + 0.125, 4) as float64) as snap_lat,
+    cast(round(floor(longitude / 0.25) * 0.25 + 0.125, 4) as float64) as snap_lon,
+
+    -- Convert elevation (negative) to positive depth — elevation_m not exposed downstream
     abs(elevation_m) as depth_m,
 
-    -- Snapping logic (The "Join Optimizer")
-    cast(floor(latitude / 0.25) * 0.25 + 0.125 as float64) as grid_lat,
-    cast(floor(longitude / 0.25) * 0.25 + 0.125 as float64) as grid_lon,
-
-    -- Surrogate key for the grid cell
-    -- Standardized Spatial ID
-
-    {{ dbt_utils.generate_surrogate_key([
-        'cast(round(floor(latitude / 0.25) * 0.25 + 0.125, 4) as string)',
-        'cast(round(floor(longitude / 0.25) * 0.25 + 0.125, 4) as string)'
-    ]) }} as spatial_id
+    -- Spatial join key — string-cast to prevent float precision hash drift
+    {{ generate_grid_id('latitude', 'longitude') }} as spatial_id,
 
     case
         when elevation_m > -50  then 'shallow'
@@ -29,4 +27,4 @@ select
     end as depth_category
 
 from {{ source('med_wind_prod', 'raw_bathymetry') }}
-where elevation_m < 0 -- Marine cells only
+where elevation_m < 0  -- Marine cells only

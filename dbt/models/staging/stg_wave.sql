@@ -1,30 +1,36 @@
 -- stg_wave.sql
 -- Staging model for raw wave data
--- Selects and renames columns from raw_wave_data
--- No business logic — just cleaning and standardization
--- Professional Fix: Standardized grid-snapping and surrogate keys to match stg_wind
+-- Selects, renames, and standardizes columns from raw_wave_data
+-- No business logic — column renaming, unit clarification, and ID generation only
+--
+-- FIX: spatial_id now uses cast(round(..., 4) as string) hashing to match
+--      stg_bathymetry, stg_coastline_distance, and int_site_centers.
+--      Previous float64 hashing caused silent join failures.
+-- FIX: grid_lat/grid_lon renamed to snap_lat/snap_lon per nomenclature standard.
+-- FIX: generate_grid_id macro now used for spatial_id.
 
 select
-    -- Unique ID for the specific location name
+    -- True primary key for time-series data (Site + Timestamp)
+    {{ dbt_utils.generate_surrogate_key(['location_name', 'observation_time']) }} as record_id,
+
+    -- Foreign key to the site location
     {{ dbt_utils.generate_surrogate_key(['location_name']) }} as site_id,
     
     location_name,
     observation_time,
+
     wave_height,
     wave_direction,
     wave_period,
 
-    -- Snap to the 0.25 degree grid center
-    cast(floor(latitude / 0.25) * 0.25 + 0.125 as float64) as grid_lat,
-    cast(floor(longitude / 0.25) * 0.25 + 0.125 as float64) as grid_lon,
+    -- Snap raw coordinates to the 0.25 degree grid center
+    cast(round(floor(latitude  / 0.25) * 0.25 + 0.125, 4) as float64) as snap_lat,
+    cast(round(floor(longitude / 0.25) * 0.25 + 0.125, 4) as float64) as snap_lon,
 
-    -- Create the same spatial_id used in bathymetry and wind
-    {{ dbt_utils.generate_surrogate_key([
-        'cast(floor(latitude / 0.25) * 0.25 + 0.125 as float64)',
-        'cast(floor(longitude / 0.25) * 0.25 + 0.125 as float64)'
-    ]) }} as spatial_id,
+    -- Spatial join key — string-cast to prevent float precision hash drift
+    {{ generate_grid_id('latitude', 'longitude') }} as spatial_id,
 
-    extract(year from observation_time) as year,
+    extract(year  from observation_time) as year,
     extract(month from observation_time) as month
 
 from {{ source('med_wind_prod', 'raw_wave_data') }}

@@ -27,4 +27,4 @@ select
     end as depth_category
 
 from {{ source('med_wind_prod', 'raw_bathymetry') }}
-where elevation_m < 0  -- Marine cells only
+where elevation_m > 0  -- Marine cells only

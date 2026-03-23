@@ -23,14 +23,14 @@ models:
     # One model per raw table, no business logic here
     staging:
       +materialized: view        # views are cheap and always up to date
-      +schema: med_wind_prod     # writes to med_wind_prod dataset in BigQuery
+      +schema: wind_staging     # writes to med_wind_prod dataset in BigQuery
 
     intermediate:
       +materialized: view        # views are cheap and always up to date
-      +schema: med_wind_prod     # same dataset, different model prefix 
+      +schema: wind_intermediate # writes to med_wind_prod dataset in BigQuery
 
-    # Core models — final tables with business logic and scoring
-    # Materialized as tables because they are queried by the dashboard
-    core:
+    # marts are the final models that feed the dashboard 
+    marts:
       +materialized: table       # tables are faster to query than views
-      +schema: med_wind_prod     # same dataset, different model prefix
+      +schema: wind_marts        # ready for analysis, writes to med_wind_prod dataset in BigQuery
+

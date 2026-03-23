@@ -57,3 +57,4 @@ joined as (
 )
 
 select * from joined
+where depth_m > 5 AND depth_m <= 200  -- Final viability filter for fixed turbines only; see turbine_type logic above for exclusions turbines

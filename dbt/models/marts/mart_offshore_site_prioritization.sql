@@ -17,4 +17,8 @@ select
     *
 
 from {{ ref('int_site_composite_score') }}
-order by site_rank
+-- 1. Must have water
+where depth_m > 5 
+-- 2. Must be away from the beach (Physical/Legal buffer)
+-- Most offshore wind farms must be at least 2-5km from shore anyway
+and distance_to_coast_km > 2

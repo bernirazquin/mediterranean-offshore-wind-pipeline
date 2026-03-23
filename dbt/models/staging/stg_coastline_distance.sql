@@ -30,3 +30,5 @@ from {{ source('med_wind_prod', 'raw_coastline_distance') }} c
 inner join {{ source('med_wind_prod', 'raw_bathymetry') }} b
     on round(c.latitude, 3) = round(b.latitude, 3)
     and round(c.longitude, 3) = round(b.longitude, 3)
+
+where c.distance_to_coast_km >= 2  -- Filter out invalid data (negative distances)

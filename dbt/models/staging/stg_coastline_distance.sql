@@ -25,6 +25,7 @@ select
     end as distance_category
 
 from {{ source('med_wind_prod', 'raw_coastline_distance') }} c
+
 -- We still keep this inner join to ensure we only have marine data
 inner join {{ source('med_wind_prod', 'raw_bathymetry') }} b
     on round(c.latitude, 3) = round(b.latitude, 3)

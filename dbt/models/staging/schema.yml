@@ -1,0 +1,38 @@
+version: 2
+
+models:
+  # --- STAGING LAYER: Basic Data Integrity ---
+  - name: stg_wind
+    columns:
+      - name: spatial_id
+        data_tests:
+          - not_null
+
+  - name: stg_bathymetry
+    columns:
+      - name: spatial_id
+        data_tests:
+          - not_null
+      - name: depth_m
+        data_tests:
+          - not_null
+
+  - name: stg_wave
+    columns:
+      - name: spatial_id
+        data_tests:
+          - not_null
+
+  # --- INTERMEDIATE LAYER: Business Logic Integrity ---
+  - name: int_site_spatial_summary
+    description: "One row per unique offshore wind site. This is where we test uniqueness."
+    columns:
+      - name: site_name
+        data_tests:
+          - unique
+          - not_null
+      - name: spatial_id
+        description: "The unique grid cell ID."
+        data_tests:
+          - unique
+          - not_null

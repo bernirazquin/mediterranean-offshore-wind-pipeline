@@ -9,9 +9,44 @@
 -- Dependencies: stg_wind
 -- Used by:      int_site_spatial_samples
 
-select distinct
-    location_name                                                  as site_name,
-    CAST(SPLIT(location_name, '_')[OFFSET(3)] AS FLOAT64)         as center_lat,
-    CAST(SPLIT(location_name, '_')[OFFSET(4)] AS FLOAT64)         as center_lon
-from {{ ref('stg_wind') }}
-where location_name like 'GULF_OF_LION_%'
+-- int_site_centers.sql
+
+with site_extraction as (
+    select
+        location_name as site_name,
+        split(location_name, '_') as name_parts
+    from {{ ref('stg_wind') }}
+    group by 1, 2
+),
+
+parsed_coords as (
+    select
+        site_name,
+        -- Safely grab coordinates only if the name has enough parts
+        case 
+            when array_length(name_parts) >= 5 
+            then cast(name_parts[offset(3)] as float64) 
+            else null 
+        end as raw_lat,
+        case 
+            when array_length(name_parts) >= 5 
+            then cast(name_parts[offset(4)] as float64) 
+            else null 
+        end as raw_lon
+    from site_extraction
+)
+
+select
+    site_name,
+    raw_lat as center_lat,
+    raw_lon as center_lon,
+    
+    -- The Standardized Grid Math
+    {{ dbt_utils.generate_surrogate_key([
+        'cast(round(floor(raw_lat / 0.25) * 0.25 + 0.125, 4) as string)',
+        'cast(round(floor(raw_lon / 0.25) * 0.25 + 0.125, 4) as string)'
+    ]) }} as spatial_id
+
+from parsed_coords
+-- Filter out any malformed names that didn't have coordinates
+where raw_lat is not null

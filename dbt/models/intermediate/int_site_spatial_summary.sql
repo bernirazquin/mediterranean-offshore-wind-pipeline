@@ -4,6 +4,7 @@
 
 select
     site_name,
+    site_id,
     spatial_id,
     center_lat,
     center_lon,

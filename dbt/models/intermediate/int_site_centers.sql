@@ -41,6 +41,9 @@ parsed_coords as (
 marine_only as (
     select
         pc.site_name,
+        -- Surrogate key generated the same way as stg_wind.site_id so the two
+        -- branches of the DAG join cleanly on site_id without relying on site_name.
+        {{ dbt_utils.generate_surrogate_key(['pc.site_name']) }} as site_id,
         pc.raw_lat,
         pc.raw_lon,
         {{ generate_grid_id('pc.raw_lat', 'pc.raw_lon') }} as spatial_id
@@ -59,6 +62,7 @@ marine_only as (
 
 select
     site_name,
+    site_id,
     raw_lat as center_lat,
     raw_lon as center_lon,
     spatial_id

@@ -24,7 +24,8 @@ with base as (
         sp.turbine_type
     from {{ ref('int_site_wave_summary') }} w
     inner join {{ ref('int_site_spatial_score') }} sp
-        on w.site_name = sp.site_name
+        -- site_id is the surrogate key — avoids string join on site_name
+        on w.site_id = sp.site_id
 ),
 
 scored as (

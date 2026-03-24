@@ -20,6 +20,7 @@
 with base as (
     select
         site_name,
+        site_id,
         spatial_id,
         center_lat,
         center_lon,
@@ -90,6 +91,7 @@ scored as (
 
 select
     site_name,
+    site_id,
     spatial_id,
     center_lat,
     center_lon,

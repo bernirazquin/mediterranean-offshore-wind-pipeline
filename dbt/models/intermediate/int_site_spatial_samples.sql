@@ -11,6 +11,7 @@
 with cell_samples as (
     select
         sc.site_name,
+        sc.site_id,
         sc.spatial_id,
         sc.center_lat,
         sc.center_lon,
@@ -48,7 +49,7 @@ with cell_samples as (
     left join {{ ref('stg_bathymetry') }}         b  on sc.spatial_id = b.spatial_id
     left join {{ ref('stg_coastline_distance') }}  cd on sc.spatial_id = cd.spatial_id
 
-    group by 1, 2, 3, 4
+    group by 1, 2, 3, 4, 5
 )
 
 select 

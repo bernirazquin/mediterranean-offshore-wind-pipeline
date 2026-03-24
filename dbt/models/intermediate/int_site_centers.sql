@@ -45,9 +45,14 @@ marine_only as (
         pc.raw_lon,
         {{ generate_grid_id('pc.raw_lat', 'pc.raw_lon') }} as spatial_id
     from parsed_coords pc
-    -- Only keep cells with at least one marine bathymetry sample
+    -- Ensures only site centroids with at least one confirmed marine bathymetry cell
+    -- are retained. Without this, land grid cells with any bathymetry coverage pass
+    -- through silently. The is_land = 0 condition enforces the marine-only check;
+    -- matching on spatial_id alone is insufficient because stg_bathymetry previously
+    -- included land rows that shared a spatial_id with coastal wind grid points.
     inner join {{ ref('stg_bathymetry') }} b
         on {{ generate_grid_id('pc.raw_lat', 'pc.raw_lon') }} = b.spatial_id
+        and b.is_land = 0
     where pc.raw_lat is not null
     group by 1, 2, 3, 4
 )

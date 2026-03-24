@@ -101,6 +101,12 @@ models:
     columns:
       - name: site_name
         data_tests: [unique, not_null]
+      - name: avg_score
+        data_tests: [not_null]
+      - name: p50_score
+        data_tests: [not_null]
+      - name: p90_score
+        data_tests: [not_null]
       - name: wind_score
         data_tests: [not_null]
       - name: wind_potential_class

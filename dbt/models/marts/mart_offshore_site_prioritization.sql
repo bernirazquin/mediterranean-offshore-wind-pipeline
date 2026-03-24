@@ -10,7 +10,7 @@
 --                               with survivability multiplier applied
 --
 -- Hard gates applied in int_site_composite_score:
---   depth_m >= 10, distance_to_coast_km >= 11, depth_m <= 300
+--   depth_m >= 10, distance_to_coast_km >= 11, depth_m <= 1000
 --   turbine_type != 'not_viable'
 --
 -- This mart is the decision-making layer — only engineeringly viable sites.

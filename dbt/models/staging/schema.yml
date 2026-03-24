@@ -53,12 +53,6 @@ models:
       - name: depth_m
         description: "Positive water depth in metres. abs(elevation_m) from source."
         data_tests: [not_null]
-      - name: depth_category
-        data_tests:
-          - not_null
-          - accepted_values:
-              arguments:
-                values: ['shallow', 'transitional', 'deep']
       - name: snap_lat
         data_tests: [not_null]
       - name: snap_lon

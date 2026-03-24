@@ -3,7 +3,7 @@
 -- Used exclusively by mart_offshore_site_gis for GIS export.
 -- Do NOT use this model for scoring or decision making.
 --
--- All 111 grid points flow through here regardless of depth,
+-- All 102 marine grid points flow through here regardless of depth,
 -- distance, or turbine viability.
 
 with spatial as (
@@ -22,6 +22,7 @@ wave as (
 joined as (
     select
         sp.site_name,
+        sp.site_id,
         sp.spatial_id,
         sp.center_lat,
         sp.center_lon,
@@ -51,8 +52,9 @@ joined as (
         4) as raw_final_score
 
     from spatial sp
-    inner join wind w  on sp.site_name = w.site_name
-    inner join wave wv on sp.site_name = wv.site_name
+    -- site_id is the surrogate key — avoids string join on site_name
+    inner join wind w  on sp.site_id = w.site_id
+    inner join wave wv on sp.site_id = wv.site_id
 )
 
 select

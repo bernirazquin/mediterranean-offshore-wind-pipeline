@@ -3,7 +3,10 @@ version: 2
 models:
 
   - name: int_site_centers
-    description: "111 Gulf of Lion site centroids parsed from wind location keys."
+    description: >
+      102 Gulf of Lion marine site centroids parsed from wind location keys.
+      Land cells filtered via bathymetry join — 9 wind grid points had zero
+      marine bathymetry samples and are excluded.
     columns:
       - name: site_name
         data_tests: [unique, not_null]
@@ -61,8 +64,8 @@ models:
       coast_score, spatial_score, and turbine_type.
       Fixed turbines use linear scoring. Floating turbines use bell curves
       peaking at 180m depth and 35km from coast.
-      CHANGE: nearshore penalty removed — redundant with 11km hard gate.
-      CHANGE: floating turbine upper depth limit raised to 300m.
+      CHANGE: nearshore penalty removed — redundant with turbine-type aware distance gate.
+      CHANGE: floating turbine upper depth limit raised to 1000m.
     columns:
       - name: site_name
         data_tests: [unique, not_null]
@@ -76,7 +79,8 @@ models:
         data_tests:
           - not_null
           - accepted_values:
-              values: ['fixed', 'floating', 'not_viable']
+              arguments:
+                values: ['fixed', 'floating', 'not_viable']
 
   - name: int_site_wind_score
     description: >
@@ -91,15 +95,15 @@ models:
         data_tests:
           - not_null
           - accepted_values:
-              values: ['high', 'medium', 'low']
+              arguments:
+                values: ['high', 'medium', 'low']
 
   - name: int_site_wave_score
     description: >
       Wave scores per site. Single source of truth for wave_score,
       survivability_class, and sea_state_class.
-      CHANGE: wave scoring is now turbine-type aware.
-      Fixed turbines: score hits 0 at 4m avg wave height.
-      Floating turbines: score hits 0 at 6m avg wave height.
+      Turbine-type aware: fixed turbines score 0 at 4m avg wave height,
+      floating turbines score 0 at 6m avg wave height.
     columns:
       - name: site_name
         data_tests: [unique, not_null]
@@ -109,22 +113,23 @@ models:
         data_tests:
           - not_null
           - accepted_values:
-              values: ['high', 'medium', 'low']
+              arguments:
+                values: ['high', 'medium', 'low']
       - name: sea_state_class
         data_tests:
           - not_null
           - accepted_values:
-              values: ['choppy', 'moderate', 'swell']
+              arguments:
+                values: ['choppy', 'moderate', 'swell']
 
   - name: int_site_composite_score
     description: >
       Final composite score per site joining spatial (40%), wind (40%), and wave (20%) scores.
       Inner join means only sites with all three data sources are included.
       Survivability multiplier applied to final_score: high=1.0, medium=0.9, low=0.7.
-      Physical gates: depth >= 10m, distance >= 11km, depth <= 300m.
-      CHANGE: weights updated from 30/50/20 to 40/40/20.
-      CHANGE: survivability multiplier added.
-      CHANGE: nearshore_penalty removed.
+      Physical gates: depth >= 10m, depth <= 1000m.
+      Fixed turbines: distance >= 11km from coast.
+      Floating turbines: distance >= 5km from coast (viable in deep water near cliffs).
       This is the only model the mart should read from.
     columns:
       - name: site_name
@@ -139,4 +144,30 @@ models:
         data_tests:
           - not_null
           - accepted_values:
-              values: ['fixed', 'floating']
+              arguments:
+                values: ['fixed', 'floating']
+
+  - name: int_site_composite_score_unfiltered
+    description: >
+      Identical to int_site_composite_score but with no hard gates applied.
+      All 102 marine sites flow through regardless of depth, distance, or turbine viability.
+      Used exclusively by mart_offshore_site_gis for GIS export.
+      viability_flag explains why each site would be excluded from the filtered mart.
+      Do NOT use this model for scoring or decision making.
+    columns:
+      - name: site_name
+        data_tests: [unique, not_null]
+      - name: final_score
+        data_tests: [not_null]
+      - name: viability_flag
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - 'viable'
+                  - 'excluded: depth < 10m'
+                  - 'excluded: depth > 1000m'
+                  - 'excluded: not viable'
+                  - 'excluded: fixed < 11km coast'
+                  - 'excluded: floating < 5km coast'

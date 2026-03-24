@@ -57,7 +57,8 @@ models:
         data_tests:
           - not_null
           - accepted_values:
-              values: ['shallow', 'transitional', 'deep']
+              arguments:
+                values: ['shallow', 'transitional', 'deep']
       - name: snap_lat
         data_tests: [not_null]
       - name: snap_lon
@@ -75,4 +76,5 @@ models:
         data_tests:
           - not_null
           - accepted_values:
-              values: ['nearshore', 'midshore', 'offshore']
+              arguments:
+                values: ['nearshore', 'midshore', 'offshore']

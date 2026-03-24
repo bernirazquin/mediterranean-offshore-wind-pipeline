@@ -7,8 +7,9 @@ models:
       Final ranked table of viable offshore wind sites.
       Pure presentation layer — no business logic.
       All scoring lives in int_site_composite_score.
-      CHANGE: weights updated from spatial 40% + wind 60% to
-      spatial 40%, wind 40%, wave 20% with survivability multiplier.
+      Composite score: spatial 40%, wind 40%, wave 20%
+      with survivability multiplier applied.
+      Fixed turbines: distance >= 11km. Floating turbines: distance >= 5km.
     columns:
       - name: site_rank
         description: "1 = highest priority site. Derived from final_score via ROW_NUMBER()."
@@ -23,14 +24,44 @@ models:
         data_tests:
           - not_null
           - accepted_values:
-              values: ['fixed', 'floating']
+              arguments:
+                values: ['fixed', 'floating']
       - name: wind_potential_class
         data_tests:
           - not_null
           - accepted_values:
-              values: ['high', 'medium', 'low']
+              arguments:
+                values: ['high', 'medium', 'low']
       - name: survivability_class
         data_tests:
           - not_null
           - accepted_values:
-              values: ['high', 'medium', 'low']
+              arguments:
+                values: ['high', 'medium', 'low']
+
+  - name: mart_offshore_site_gis
+    description: >
+      Full unfiltered export of all 102 marine sites for GIS analysis.
+      Pure presentation layer — no business logic.
+      Includes viability_flag so GIS analysts can see why sites were excluded
+      from mart_offshore_site_prioritization.
+      Do NOT use for decision making — use mart_offshore_site_prioritization instead.
+      IMPORTANT: verify all viable sites against high-res land mask in QGIS
+      before using for reporting.
+    columns:
+      - name: site_name
+        data_tests: [unique, not_null]
+      - name: final_score
+        data_tests: [not_null]
+      - name: viability_flag
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - 'viable'
+                  - 'excluded: depth < 10m'
+                  - 'excluded: depth > 1000m'
+                  - 'excluded: not viable'
+                  - 'excluded: fixed < 11km coast'
+                  - 'excluded: floating < 5km coast'

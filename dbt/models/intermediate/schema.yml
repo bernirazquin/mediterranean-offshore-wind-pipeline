@@ -43,6 +43,10 @@ models:
         data_tests: [unique, not_null]
       - name: avg_wind_speed_ms
         data_tests: [not_null]
+      - name: p50_wind_speed_ms
+        data_tests: [not_null]
+      - name: p90_wind_speed_ms
+        data_tests: [not_null]
 
   - name: int_site_wave_summary
     description: "One row per site aggregating historical wave statistics."

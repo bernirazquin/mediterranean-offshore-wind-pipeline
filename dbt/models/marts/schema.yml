@@ -45,10 +45,13 @@ models:
       Pure presentation layer — no business logic.
       Includes viability_flag so GIS analysts can see why sites were excluded
       from mart_offshore_site_prioritization.
+      site_rank is only assigned to viable sites — excluded sites show null.
       Do NOT use for decision making — use mart_offshore_site_prioritization instead.
       IMPORTANT: verify all viable sites against high-res land mask in QGIS
       before using for reporting.
     columns:
+      - name: site_rank
+        description: "Rank among viable sites only. Excluded sites show null."
       - name: site_name
         data_tests: [unique, not_null]
       - name: final_score

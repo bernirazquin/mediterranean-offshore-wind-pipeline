@@ -7,7 +7,9 @@
 --      stg_bathymetry, stg_coastline_distance, and int_site_centers.
 --      Previous float64 hashing caused silent join failures.
 -- FIX: grid_lat/grid_lon renamed to snap_lat/snap_lon per nomenclature standard.
--- FIX: wind_speed_100m renamed to wind_speed_ms (explicit unit).
+-- FIX: wind_speed_100m renamed to wind_speed_ms and converted from km/h to m/s.
+--      Source raw_wind_data stores wind speed in km/h — dividing by 3.6 converts
+--      to m/s which is the standard unit for all downstream scoring.
 -- FIX: location_name retained as-is for coord parsing in int_site_centers,
 --      but site_id is now the surrogate key generated from it.
 -- FIX: generate_grid_id macro now used for spatial_id.
@@ -22,9 +24,9 @@ select
     location_name,
     observation_time,
 
-    -- Explicit unit in column name
-    wind_speed_100m    as wind_speed_ms,
-    wind_direction_100m as wind_direction,
+    -- Convert from km/h to m/s (source data is in km/h)
+    round(wind_speed_100m / 3.6, 4)     as wind_speed_ms,
+    wind_direction_100m                  as wind_direction,
 
     -- Snap raw coordinates to the 0.25 degree grid center
     cast(round(floor(latitude  / 0.25) * 0.25 + 0.125, 4) as float64) as snap_lat,

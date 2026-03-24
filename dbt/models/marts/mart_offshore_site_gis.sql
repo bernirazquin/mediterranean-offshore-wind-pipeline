@@ -6,7 +6,7 @@
 -- Points here may be:
 --   - Too shallow (depth < 10m) — potentially inland
 --   - Too close to shore (distance < 11km)
---   - Beyond floating turbine range (depth > 300m)
+--   - Beyond floating turbine range (depth > 1000m)
 --   - not_viable turbine type
 --
 -- Purpose: let GIS analysts apply a high-res land mask and verify which
@@ -21,7 +21,6 @@ select
     case
         when viability_flag = 'viable' then
             ROW_NUMBER() OVER (
-                PARTITION BY viability_flag = 'viable'
                 ORDER BY final_score DESC, avg_wind_speed_ms DESC, site_name ASC
             )
         else null

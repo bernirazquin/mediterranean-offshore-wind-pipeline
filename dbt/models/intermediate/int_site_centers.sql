@@ -7,8 +7,12 @@
 -- coordinates in a CASE WHEN block. In the new design, coordinates are
 -- encoded in the KV store key and flow through to raw_wind_data automatically.
 --
--- Dependencies: stg_wind
+-- Dependencies: stg_wind, stg_bathymetry
 -- Used by:      int_site_spatial_samples
+--
+-- CHANGE: Added bathymetry filter to exclude land cells.
+--         9 grid points had zero marine bathymetry samples (confirmed land).
+--         Official marine site count is 102, not 111.
 
 with site_extraction as (
     select
@@ -21,7 +25,6 @@ with site_extraction as (
 parsed_coords as (
     select
         site_name,
-        -- Safely grab coordinates only if the name has enough parts
         case 
             when array_length(name_parts) >= 5 
             then cast(name_parts[offset(3)] as float64) 
@@ -33,15 +36,26 @@ parsed_coords as (
             else null 
         end as raw_lon
     from site_extraction
+),
+
+marine_only as (
+    select
+        pc.site_name,
+        pc.raw_lat,
+        pc.raw_lon,
+        {{ generate_grid_id('pc.raw_lat', 'pc.raw_lon') }} as spatial_id
+    from parsed_coords pc
+    -- Only keep cells with at least one marine bathymetry sample
+    inner join {{ ref('stg_bathymetry') }} b
+        on {{ generate_grid_id('pc.raw_lat', 'pc.raw_lon') }} = b.spatial_id
+    where pc.raw_lat is not null
+    group by 1, 2, 3, 4
 )
 
 select
     site_name,
     raw_lat as center_lat,
     raw_lon as center_lon,
-    
-    -- Replace the hardcoded math with the macro!
-    {{ generate_grid_id('raw_lat', 'raw_lon') }} as spatial_id
+    spatial_id
 
-from parsed_coords
-where raw_lat is not null
+from marine_only

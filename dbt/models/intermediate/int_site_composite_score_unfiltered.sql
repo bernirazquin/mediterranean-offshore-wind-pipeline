@@ -62,10 +62,13 @@ select
     -- from the decision-making mart
     case
         when depth_m < 10                then 'excluded: depth < 10m'
-        when distance_to_coast_km < 11   then 'excluded: distance < 11km'
-        when depth_m > 300               then 'excluded: depth > 300m'
+        when depth_m > 1000              then 'excluded: depth > 1000m'
         when turbine_type = 'not_viable' then 'excluded: not viable'
-        else                                  'viable'
-    end as viability_flag
+        when turbine_type = 'fixed'    
+             and distance_to_coast_km < 11 then 'excluded: fixed < 11km coast'
+        when turbine_type = 'floating'  
+             and distance_to_coast_km < 5  then 'excluded: floating < 5km coast'
+    else                                    'viable'
+end as viability_flag
 
 from joined

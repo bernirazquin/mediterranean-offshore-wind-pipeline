@@ -18,6 +18,9 @@
 --         is already partially captured in wave score.
 -- CHANGE: Survivability multiplier added to final_score
 -- CHANGE: nearshore_penalty removed — dropped from spatial score model
+-- CHANGE: Distance gate is now turbine-type aware (fixed >= 11km, 
+--         floating >= 5km)
+
 
 with spatial as (
     select * from {{ ref('int_site_spatial_score') }}
@@ -106,7 +109,11 @@ select
     round(raw_final_score * survivability_multiplier, 4) as final_score
 
 from joined
--- Physical threshold gates
+-- Turbine-type aware distance gate
+-- CHANGE: floating turbines use 5km minimum instead of 11km
 where depth_m >= 10
-  and distance_to_coast_km >= 11
   and depth_m <= 1000
+  and (
+      (turbine_type = 'fixed'    and distance_to_coast_km >= 11)
+   or (turbine_type = 'floating' and distance_to_coast_km >= 5)
+  )

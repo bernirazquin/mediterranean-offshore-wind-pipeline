@@ -28,7 +28,18 @@ with cell_samples as (
         -- Aggregated Coastline Distance
         avg(cd.distance_to_coast_km)    as distance_to_coast_km,
         min(cd.distance_to_coast_km)    as distance_min_km,
-        any_value(cd.distance_category) as distance_category,
+
+        -- Re-derived from cell average — not grabbed arbitrarily
+        -- from a single pixel via any_value().
+        -- Thresholds match the hard gates in int_site_composite_score:
+        --   nearshore < 11km (fixed turbine minimum gate)
+        --   midshore  <= 50km
+        --   offshore  > 50km
+        case
+            when avg(cd.distance_to_coast_km) < 11  then 'nearshore'
+            when avg(cd.distance_to_coast_km) <= 50 then 'midshore'
+            else                                         'offshore'
+        end as distance_category,
 
         -- Renamed from raster_cells_sampled
         count(b.spatial_id) as sample_count

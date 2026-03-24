@@ -71,3 +71,5 @@ logs/
 .idea/
 .DS_Store
 Thumbs.db
+AUDIT.md
+STATUS.md

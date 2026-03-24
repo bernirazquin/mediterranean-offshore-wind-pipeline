@@ -18,3 +18,5 @@ select
 
 from {{ ref('int_site_spatial_samples') }}
 where depth_m is not null
+  -- If more than 10% of the grid cell is land, we evict it.
+  and marine_coverage_pct >= 0.90

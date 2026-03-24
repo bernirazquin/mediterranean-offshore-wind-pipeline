@@ -14,17 +14,13 @@ select
     cast(round(floor(latitude  / 0.25) * 0.25 + 0.125, 4) as float64) as snap_lat,
     cast(round(floor(longitude / 0.25) * 0.25 + 0.125, 4) as float64) as snap_lon,
 
-    -- Convert elevation (negative) to positive depth — elevation_m not exposed downstream
-    abs(elevation_m) as depth_m,
+    -- Raw data
+    elevation_m as raw_elevation_m,
+
+    -- Flag for land vs water
+    CASE WHEN elevation_m >= 0 THEN 1 ELSE 0 END AS is_land,
 
     -- Spatial join key — string-cast to prevent float precision hash drift
     {{ generate_grid_id('latitude', 'longitude') }} as spatial_id,
 
-    case
-        when elevation_m > -50  then 'shallow'
-        when elevation_m > -200 then 'transitional'
-        else                         'deep'
-    end as depth_category
-
 from {{ source('med_wind_prod', 'raw_bathymetry') }}
-where elevation_m < 0  -- Marine cells only

@@ -15,11 +15,15 @@ with cell_samples as (
         sc.center_lat,
         sc.center_lon,
 
-        -- Aggregated Bathymetry
-        avg(b.depth_m)              as depth_m,
-        min(b.depth_m)              as depth_min_m,
-        max(b.depth_m)              as depth_max_m,
-        any_value(b.depth_category) as depth_category,
+        -- purified bathymetry
+        -- Only average points that are actually in the water (< 0)
+        avg(case when b.elevation_m < 0 then abs(b.elevation_m) end) as depth_m,
+        min(case when b.elevation_m < 0 then abs(b.elevation_m) end) as depth_min_m,
+        max(case when b.elevation_m < 0 then abs(b.elevation_m) end) as depth_max_m,
+
+        -- marine coverage math
+        -- (Count of points < 0) / (Total points in the 25km cell)
+        countif(b.elevation_m < 0) / count(b.spatial_id) as marine_coverage_pct,
 
         -- Aggregated Coastline Distance
         avg(cd.distance_to_coast_km)    as distance_to_coast_km,
@@ -36,4 +40,13 @@ with cell_samples as (
     group by 1, 2, 3, 4
 )
 
-select * from cell_samples
+select 
+    *,
+    -- Apply site-level category based on the purified average
+    case
+        when depth_m < 50  then 'shallow'
+        when depth_m < 200 then 'transitional'
+        else 'deep'
+    end as depth_category
+
+from cell_samples

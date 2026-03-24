@@ -14,7 +14,8 @@ select
     distance_to_coast_km,
     distance_min_km,
     distance_category,
-    sample_count
+    sample_count,
+    marine_coverage_pct
 
 from {{ ref('int_site_spatial_samples') }}
 where depth_m is not null

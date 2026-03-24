@@ -20,7 +20,7 @@ models:
         data_tests: [not_null]
 
   - name: int_site_spatial_summary
-    description: "One row per site with aggregated depth and distance values. Nulls filtered."
+    description: "One row per site with aggregated depth and distance values. Nulls filtered. No scoring logic."
     columns:
       - name: site_name
         data_tests: [unique, not_null]
@@ -41,10 +41,28 @@ models:
       - name: avg_wind_speed_ms
         data_tests: [not_null]
 
+  - name: int_site_wave_summary
+    description: "One row per site aggregating historical wave statistics."
+    columns:
+      - name: site_id
+        data_tests: [unique, not_null]
+      - name: site_name
+        data_tests: [unique, not_null]
+      - name: avg_wave_height_m
+        data_tests: [not_null]
+      - name: max_wave_height_m
+        data_tests: [not_null]
+      - name: avg_wave_period_s
+        data_tests: [not_null]
+
   - name: int_site_spatial_score
     description: >
       Spatial scores per site. Single source of truth for depth_score,
-      coast_score, and spatial_score. Only viable turbine sites included.
+      coast_score, spatial_score, and turbine_type.
+      Fixed turbines use linear scoring. Floating turbines use bell curves
+      peaking at 180m depth and 35km from coast.
+      CHANGE: nearshore penalty removed — redundant with 11km hard gate.
+      CHANGE: floating turbine upper depth limit raised to 300m.
     columns:
       - name: site_name
         data_tests: [unique, not_null]
@@ -75,19 +93,50 @@ models:
           - accepted_values:
               values: ['high', 'medium', 'low']
 
+  - name: int_site_wave_score
+    description: >
+      Wave scores per site. Single source of truth for wave_score,
+      survivability_class, and sea_state_class.
+      CHANGE: wave scoring is now turbine-type aware.
+      Fixed turbines: score hits 0 at 4m avg wave height.
+      Floating turbines: score hits 0 at 6m avg wave height.
+    columns:
+      - name: site_name
+        data_tests: [unique, not_null]
+      - name: wave_score
+        data_tests: [not_null]
+      - name: survivability_class
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['high', 'medium', 'low']
+      - name: sea_state_class
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['choppy', 'moderate', 'swell']
+
   - name: int_site_composite_score
     description: >
-      Final composite score per site joining spatial (40%) and wind (60%) scores.
-      Inner join means only sites with both data sources are included.
+      Final composite score per site joining spatial (40%), wind (40%), and wave (20%) scores.
+      Inner join means only sites with all three data sources are included.
+      Survivability multiplier applied to final_score: high=1.0, medium=0.9, low=0.7.
+      Physical gates: depth >= 10m, distance >= 11km, depth <= 300m.
+      CHANGE: weights updated from 30/50/20 to 40/40/20.
+      CHANGE: survivability multiplier added.
+      CHANGE: nearshore_penalty removed.
       This is the only model the mart should read from.
     columns:
       - name: site_name
         data_tests: [unique, not_null]
+      - name: raw_final_score
+        data_tests: [not_null]
       - name: final_score
+        data_tests: [not_null]
+      - name: survivability_multiplier
         data_tests: [not_null]
       - name: turbine_type
         data_tests:
           - not_null
           - accepted_values:
-              arguments:
-                values: ['fixed', 'floating']
+              values: ['fixed', 'floating']

@@ -3,22 +3,22 @@
 -- This model contains NO business logic — it is a pure presentation layer.
 --
 -- All scoring, filtering, and joining happens in:
---   int_site_spatial_score    → depth_score, coast_score, spatial_score
+--   int_site_spatial_score    → depth_score, coast_score, spatial_score, turbine_type
 --   int_site_wind_score       → wind_score, wind_potential_class
---   int_site_composite_score  → final_score (30/50/20 split (Spatial/Wind/Wave))
+--   int_site_wave_score       → wave_score, survivability_class, sea_state_class
+--   int_site_composite_score  → final_score (40/40/20 Spatial/Wind/Wave)
+--                               with survivability multiplier applied
 --
--- This model only adds: site_rank via RANK() window function.
+-- Hard gates applied in int_site_composite_score:
+--   depth_m >= 10, distance_to_coast_km >= 11, depth_m <= 300
+--   turbine_type != 'not_viable'
+--
+-- This mart is the decision-making layer — only engineeringly viable sites.
+-- For the full 111-point export for GIS analysis see mart_offshore_site_gis.sql
 
 select
-    -- Ranking
-    rank() over (order by final_score desc) as site_rank,
-
-    -- All scored fields from the composite intermediate
+    ROW_NUMBER() OVER (
+        ORDER BY final_score DESC, avg_wind_speed_ms DESC, site_name ASC
+    ) as site_rank,
     *
-
 from {{ ref('int_site_composite_score') }}
--- 1. Must have water
-where depth_m > 5 
--- 2. Must be away from the beach (Physical/Legal buffer)
--- Most offshore wind farms must be at least 2-5km from shore anyway
-and distance_to_coast_km > 2

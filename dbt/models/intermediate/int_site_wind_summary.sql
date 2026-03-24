@@ -28,6 +28,6 @@ select
     round(avg_wind_speed_ms,          2) as avg_wind_speed_ms,
     round(wind_stddev,                2) as wind_stddev,
     round(max_gust_ms,                2) as max_gust_ms,
-    round(wind_power_potential_index, 2) as wind_power_potential_index,
+    round(wind_power_potential_index, 2) as wind_power_potential_index
 
 from wind_stats

@@ -1,43 +1,58 @@
 -- int_site_wave_score.sql
 -- Owns all wave scoring logic for each Gulf of Lion site.
 -- Consumes int_site_wave_summary (aggregated wave statistics).
+-- Joins int_site_spatial_score to get turbine_type for type-aware scoring.
 -- Produces one row per site with a normalised 0–1 wave score.
 --
 -- Scoring rules:
---   wave_score: penalizes sites with high average waves (maintenance constraint).
---               0m = 1.0 score, linearly decreasing to 0.0 at 3m+ avg height.
---   survivability_class: evaluates extreme conditions for structural engineering limits.
+--   fixed turbines    : wave_score hits 0 at 4m avg wave height
+--   floating turbines : wave_score hits 0 at 6m avg wave height
+--                       floating structures are engineered for rougher seas
+--
+-- survivability_class: evaluates extreme conditions against structural limits.
+-- sea_state_class    : evaluates wave period for maintenance vessel operability.
 --
 -- This model is the single source of truth for wave scoring.
 
 with base as (
     select
-        site_id,
-        site_name,
-        avg_wave_height_m,
-        max_wave_height_m,
-        avg_wave_period_s
-    from {{ ref('int_site_wave_summary') }}
+        w.site_id,
+        w.site_name,
+        w.avg_wave_height_m,
+        w.max_wave_height_m,
+        w.avg_wave_period_s,
+        sp.turbine_type
+    from {{ ref('int_site_wave_summary') }} w
+    inner join {{ ref('int_site_spatial_score') }} sp
+        on w.site_name = sp.site_name
 ),
 
 scored as (
     select
         *,
-        -- Normalised wave score: 1.0 for flat water, linearly dropping to 0.0 at 3m+
-        round(greatest(1.0 - (avg_wave_height_m / 3.0), 0.0), 4) as wave_score,
+        -- Wave score: threshold depends on turbine type
+        case
+            when turbine_type = 'fixed' then
+                -- Fixed: 0m = 1.0, linearly drops to 0.0 at 4m
+                round(greatest(1.0 - (avg_wave_height_m / 4.0), 0.0), 4)
 
-        -- Survivability flag: assesses max historical wave heights
+            when turbine_type = 'floating' then
+                -- Floating: 0m = 1.0, linearly drops to 0.0 at 6m
+                round(greatest(1.0 - (avg_wave_height_m / 6.0), 0.0), 4)
+
+            else 0
+        end as wave_score,
+
+        -- Survivability: max wave height structural limits
         case
             when max_wave_height_m < 8  then 'high'
             when max_wave_height_m < 12 then 'medium'
             else                             'low'
         end as survivability_class,
 
-        -- Sea State classification based on wave period
-        -- < 6s means steep, choppy waves (hard for maintenance vessels)
-        -- > 10s means long, rolling swells
+        -- Sea state: wave period operability for maintenance vessels
         case
-            when avg_wave_period_s < 6 then 'choppy'
+            when avg_wave_period_s < 6  then 'choppy'
             when avg_wave_period_s <= 10 then 'moderate'
             else                              'swell'
         end as sea_state_class
@@ -48,6 +63,7 @@ scored as (
 select
     site_id,
     site_name,
+    turbine_type,
     avg_wave_height_m,
     max_wave_height_m,
     avg_wave_period_s,

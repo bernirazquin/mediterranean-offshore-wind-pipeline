@@ -58,6 +58,17 @@ Future iterations are designed to incorporate:
 The architecture is deliberately extensible: adding a new spatial layer
 requires only a new ingestion script and a new dbt staging model.
 
+## Data Sources
+
+| Dataset | Source | Format | Coverage |
+|---------|--------|--------|----------|
+| Wind data | [Open-Meteo ERA5 Reanalysis](https://open-meteo.com/en/docs/historical-weather-api) | JSON via API | 111 grid points · 2006–2024 · hourly |
+| Wave data | [Open-Meteo ERA5-Ocean](https://open-meteo.com/en/docs/marine-weather-api) | JSON via API | 111 grid points · 2006–2024 · hourly |
+| Bathymetry | [ETOPO 2022 (NOAA)](https://www.ncei.noaa.gov/products/etopo-global-relief-model) | NetCDF via OPeNDAP | ~450m resolution · global |
+| Coastline | [Natural Earth 1:10m Physical Vectors](https://www.naturalearthdata.com/downloads/10m-physical-vectors/) | Shapefile | Global coastline |
+
+All data is free and publicly available. No API keys are required. Open-Meteo does
+not require authentication for historical reanalysis data.
 ---
 
 ## Architecture

@@ -329,7 +329,7 @@ Type `make` with no arguments to see all available commands.
 
 #### 1. Clone and configure
 ```bash
-git clone https://github.com/bernirazquin/mediterranean-offshore-wind-pipeline.git
+git clone https://github.com/bernirazquin/mediterranean-offshore-wind-pipeline
 cd mediterranean-offshore-wind-pipeline
 cp .env.example .env
 ```

@@ -3,7 +3,7 @@
 An end-to-end batch data pipeline to identify and rank optimal offshore wind
 turbine installation sites in the Gulf of Lion, using 19 years of historical
 wind, wave, bathymetric, and coastline data across 111 raw grid points
-(102 confirmed marine sites) at 0.25° resolution.
+(102 analysis ready sites) at 0.25° resolution.
 
 > Developed as part of the
 [Data Engineering Zoomcamp](https://github.com/DataTalksClub/data-engineering-zoomcamp)

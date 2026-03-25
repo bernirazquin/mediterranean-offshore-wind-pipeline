@@ -195,6 +195,21 @@ reasoning and are visible in the GIS mart with a `viability_flag` for
 transparency.
 
 ---
+## Data Validation
+
+A full data validation and scoring sanity checklist is available at
+[`VALIDATION.md`](VALIDATION.md).
+
+It covers:
+- Row count checks at every pipeline stage
+- Physical sanity checks (depths, coordinates, distances)
+- Score distribution and differentiation checks
+- Wind/wave correlation analysis (Mistral effect)
+- Gate consistency verification — confirms no site violates physical rules
+- Weight sensitivity analysis — confirms top rankings are stable across weight variations
+- GIS verification checklist for QGIS land mask cross-reference
+
+Run all checks after every `dbt build` and before any merge to main.
 
 ## How to Reproduce
 

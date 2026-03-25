@@ -13,9 +13,9 @@ capstone project.
 
 ## Dashboard
 
-[![Dashboard Preview](assets/dashboard.png)]
+[![Dashboard](assets/dashboard.png)](https://lookerstudio.google.com/s/ljbPw5trmGA)
 
-> 🔗 [View the interactive dashboard] https://lookerstudio.google.com/s/ljbPw5trmGA
+> 🔗 [View the interactive dashboard](https://lookerstudio.google.com/s/ljbPw5trmGA)
 
 The dashboard shows:
 - 102 marine sites evaluated, 37 viable after physical gates

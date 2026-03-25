@@ -82,6 +82,75 @@ require authentication for historical reanalysis data.
 
 ---
 
+## Project Structure
+```
+mediterranean-offshore-wind-pipeline/
+├── Makefile                        # pipeline automation — run `make` to see all commands
+├── README.md                       # project documentation
+├── VALIDATION.md                   # data quality and scoring sanity checklist
+├── areas.yaml                      # Gulf of Lion bounding box and grid resolution config
+├── docker-compose.yml              # Kestra + Postgres services
+├── requirements.txt                # Python dependencies
+├── .env.example                    # environment variable template
+├── grid_points.json                # generated 111 Gulf of Lion grid coordinates
+│
+├── assets/
+│   └── dashboard.png               # dashboard screenshot for README
+│
+├── flows/                          # Kestra flow definitions
+│   ├── site_key_values.yaml        # seeds 111 grid coordinates into KV store
+│   ├── site_data_ingestion.yaml    # wind + wave ingestion for a single site
+│   ├── site_data_backfill.yaml     # historical loop — 111 sites × 19 years
+│   ├── wind_data_ingestion.yaml    # ERA5 wind data fetcher
+│   └── wave_data_ingestion.yaml    # ERA5-Ocean wave data fetcher
+│
+├── scripts/                        # static reference data ingestion
+│   ├── generate_grid.py            # generates marine grid points from areas.yaml
+│   ├── load_bathymetry.py          # downloads ETOPO 2022, uploads to GCS + BigQuery
+│   └── load_coastline_distance.py  # downloads Natural Earth coastline, computes distances
+│
+├── terraform/                      # infrastructure as code
+│   ├── main.tf                     # GCS bucket + BigQuery datasets
+│   └── variables.tf                # project ID, region, bucket name
+│
+├── keys/                           # GCP service account credentials (git-ignored)
+│   └── google_credentials.json
+│
+└── dbt/                            # data transformations
+    ├── dbt_project.yml             # dbt project config
+    ├── packages.yml                # dbt dependencies
+    ├── macros/
+    │   ├── generate_grid_id.sql    # spatial join key macro
+    │   └── get_custom_schema.sql   # BigQuery dataset routing
+    ├── seeds/
+    │   └── manually_excluded_sites.csv  # 2 sites excluded after QGIS visual inspection
+    └── models/
+        ├── staging/                # raw source cleaning and unit conversion
+        │   ├── stg_wind.sql        # wind speed km/h → m/s, spatial_id key
+        │   ├── stg_bathymetry.sql  # marine cells only, depth_m positive
+        │   ├── stg_coastline_distance.sql  # marine pixels only, land excluded
+        │   ├── stg_wave.sql        # raw wave observations
+        │   └── sources.yml
+        ├── intermediate/           # business logic and scoring
+        │   ├── int_site_centers.sql           # 102 marine centroids from 111 wind points
+        │   ├── int_site_spatial_samples.sql   # raster aggregation per grid cell
+        │   ├── int_site_spatial_summary.sql   # depth + distance per site
+        │   ├── int_site_spatial_score.sql     # depth_score, coast_score (0–1)
+        │   ├── int_site_wind_summary.sql      # wind statistics per site
+        │   ├── int_site_wind_score.sql        # wind_score (0–1)
+        │   ├── int_site_wave_summary.sql      # wave statistics per site
+        │   ├── int_site_wave_score.sql        # wave_score, survivability_class
+        │   ├── int_site_composite_score.sql   # final_score with physical gates
+        │   ├── int_site_composite_score_unfiltered.sql  # all 102 points for GIS
+        │   └── schema.yml
+        └── marts/                  # final outputs for dashboard and GIS
+            ├── mart_offshore_site_prioritization.sql  # 37 ranked viable sites
+            ├── mart_offshore_site_gis.sql             # all 102 points with viability_flag
+            └── schema.yml
+```
+
+---
+
 ### Ingestion — Kestra flows
 
 | Flow | Description |

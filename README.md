@@ -58,6 +58,16 @@ Future iterations are designed to incorporate:
 The architecture is deliberately extensible: adding a new spatial layer
 requires only a new ingestion script and a new dbt staging model.
 
+---
+
+## Architecture
+```
+Open-Meteo API  ──┐
+ETOPO 2022      ──┼──► Kestra / Python ──► GCS (Data Lake) ──► BigQuery ──► dbt ──► Looker Studio
+Natural Earth   ──┘
+```
+---
+
 ## Data Sources
 
 | Dataset | Source | Format | Coverage |
@@ -67,16 +77,10 @@ requires only a new ingestion script and a new dbt staging model.
 | Bathymetry | [ETOPO 2022 (NOAA)](https://www.ncei.noaa.gov/products/etopo-global-relief-model) | NetCDF via OPeNDAP | ~450m resolution · global |
 | Coastline | [Natural Earth 1:10m Physical Vectors](https://www.naturalearthdata.com/downloads/10m-physical-vectors/) | Shapefile | Global coastline |
 
-All data is free and publicly available. No API keys are required. Open-Meteo does
-not require authentication for historical reanalysis data.
----
+All data is free and publicly available. No API keys are required. Open-Meteo does not 
+require authentication for historical reanalysis data.
 
-## Architecture
-```
-Open-Meteo API  ──┐
-ETOPO 2022      ──┼──► Kestra / Python ──► GCS (Data Lake) ──► BigQuery ──► dbt ──► Looker Studio
-Natural Earth   ──┘
-```
+---
 
 ### Ingestion — Kestra flows
 

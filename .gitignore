@@ -23,7 +23,9 @@ data/*
 *.zarr
 *.parquet
 *.csv
-*.csv.gz
+!dbt/seeds/*.csv
+*.csv
+!dbt/seeds/*.csv.gz
 *.jsonl
 *.log
 

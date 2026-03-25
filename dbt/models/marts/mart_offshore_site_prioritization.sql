@@ -1,24 +1,27 @@
 -- mart_offshore_site_prioritization.sql
 -- Final deliverable: ranked list of viable offshore wind sites.
--- This model contains NO business logic — it is a pure presentation layer.
+-- Pure presentation layer — no business logic except manual exclusions.
 --
--- All scoring, filtering, and joining happens in:
---   int_site_spatial_score    → depth_score, coast_score, spatial_score, turbine_type
---   int_site_wind_score       → wind_score, wind_potential_class
---   int_site_wave_score       → wave_score, survivability_class, sea_state_class
---   int_site_composite_score  → final_score (40/40/20 Spatial/Wind/Wave)
---                               with survivability multiplier applied
+-- Manual exclusions applied here (not in intermediate layer):
+--   Sites that pass all quantitative gates but plot on land in QGIS
+--   and Looker Studio are excluded via the manually_excluded_sites seed.
+--   This is the correct architectural layer for override decisions.
+--   Excluded sites remain visible in mart_offshore_site_gis with
+--   viability_flag = 'excluded: manual review — centroid plots on land'.
 --
--- Hard gates applied in int_site_composite_score:
---   depth_m >= 10, distance_to_coast_km >= 11, depth_m <= 1000
---   turbine_type != 'not_viable'
---
--- This mart is the decision-making layer — only engineeringly viable sites.
--- For the full 111-point export for GIS analysis see mart_offshore_site_gis.sql
+-- All scoring and physical gates live in int_site_composite_score.
+
+with excluded as (
+    -- Seed-based manual override: visually confirmed land-centroid misplacements
+    -- that pass quantitative marine gates but plot on land in QGIS/Looker Studio.
+    -- To reinstate a site: remove its row from seeds/manually_excluded_sites.csv
+    select site_name from {{ ref('manually_excluded_sites') }}
+)
 
 select
     ROW_NUMBER() OVER (
         ORDER BY final_score DESC, avg_wind_speed_ms DESC, site_name ASC
     ) as site_rank,
-    *
-from {{ ref('int_site_composite_score') }}
+    cs.*
+from {{ ref('int_site_composite_score') }} cs
+where cs.site_name not in (select site_name from excluded)

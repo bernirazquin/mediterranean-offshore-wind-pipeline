@@ -189,3 +189,4 @@ models:
                   - 'excluded: not viable'
                   - 'excluded: fixed < 11km coast'
                   - 'excluded: floating < 5km coast'
+                  - 'excluded: manual review — centroid plots on land'

@@ -19,6 +19,12 @@
 #   make clean          → remove venv and dbt target
 # ============================================================
 
+# Load .env file if it exists
+ifneq (,$(wildcard .env))
+    include .env
+    export
+endif
+
 KESTRA_URL       = http://localhost:8080
 KESTRA_NAMESPACE = company.wind
 KESTRA_USER      = admin@wind.com
@@ -69,6 +75,11 @@ setup:
 
 # ── Infrastructure ───────────────────────────────────────────
 infra:
+	@echo "Checking for GCP credentials..."
+	@test -f keys/google_credentials.json || \
+		(echo "ERROR: keys/google_credentials.json not found." && \
+		echo "  See README.md for setup instructions." && \
+		exit 1)
 	@echo "Provisioning infrastructure..."
 	@which terraform > /dev/null 2>&1 || (echo "Terraform not found. Installing..." && \
 		wget -q https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip -O /tmp/terraform.zip && \
@@ -76,7 +87,10 @@ infra:
 		sudo mv /tmp/terraform-bin/terraform /usr/local/bin/ && \
 		rm -rf /tmp/terraform.zip /tmp/terraform-bin && \
 		echo "Terraform installed.")
-	cd terraform && terraform init && terraform apply -auto-approve
+	cd terraform && terraform init && terraform apply -auto-approve \
+		-var="project=$(GCP_PROJECT_ID)" \
+		-var="gcs_bucket_name=med_wind_data_lake_$(GCP_PROJECT_ID)" \
+		-var="credentials=../keys/google_credentials.json"
 	@echo "Done."
 
 # ── Services ─────────────────────────────────────────────────
@@ -187,13 +201,15 @@ clean:
 # Step 1 — fill in your credentials
 #   cp .env.example .env
 #   (edit .env with your GCP project ID, service account, bucket name)
+#   Place your GCP service account JSON key at keys/google_credentials.json
 #
 # Step 2 — set up Python environment
 #   make setup
 #
 # Step 3 — provision GCP infrastructure
 #   make infra
-#   (creates GCS bucket and BigQuery datasets via Terraform)
+#   (installs Terraform if needed, creates GCS bucket and BigQuery datasets)
+#   (uses GCP_PROJECT_ID from .env automatically)
 #
 # Step 4 — start Kestra
 #   make services
@@ -205,3 +221,56 @@ clean:
 #   make flow-sync
 #   (pushes all YAML flow definitions from flows/ into Kestra)
 #   (run this any time you update a flow file)
+#
+# Step 6 — load static reference data
+#   make ingest
+#   (downloads ETOPO bathymetry and Natural Earth coastline — ~30 min)
+#
+# Step 7 — seed grid coordinates into Kestra
+#   make flow-keys
+#   (seeds all 111 Gulf of Lion grid points into Kestra KV store)
+#   (note: 9 of 111 are inland — excluded automatically in dbt)
+#   (re-run this any time Docker volumes are reset or Kestra is restarted)
+#
+# Step 8 — validate the pipeline with one site before full backfill
+#   make flow-test
+#   (seeds KV store automatically, then ingests one site for one month)
+#   (check Kestra UI at http://localhost:8080 to confirm it worked)
+#   (only proceed to Step 9 if this passes)
+#
+# Step 9 — run full historical backfill
+#   make flow-backfill
+#   (ingests wind + wave for all 111 sites × 19 years — takes 2-4 hours)
+#   (monitor progress at http://localhost:8080)
+#   (DO NOT run make dbt until this completes)
+#
+# Step 10 — run dbt transformations
+#   make dbt
+#   (builds all models and runs 121 tests)
+#   (expected output: 121/121 nodes passing)
+#
+# Step 11 — view results
+#   open http://localhost:8080 to see Kestra execution history
+#   open Looker Studio dashboard to see ranked sites
+#
+# ─────────────────────────────
+# SHORTCUT — skip ingestion (data already in BigQuery):
+#   make setup
+#   make services
+#   make wait
+#   make flow-sync
+#   make dbt
+#
+# ─────────────────────────────
+# SUBSEQUENT RUNS:
+#   make services    → start Kestra if stopped
+#   make flow-sync   → update flows after editing YAML files
+#   make flow-keys   → re-seed KV store if Docker was restarted
+#   make dbt         → re-run transformations after data changes
+#   make down        → stop all services when done
+#
+# TROUBLESHOOTING:
+#   make flow-test   → use this to debug ingestion issues on a single site
+#   make flow-sync   → run this if flows in Kestra UI don't match repo files
+#   make clean       → reset venv and dbt artifacts if something breaks
+# ============================================================

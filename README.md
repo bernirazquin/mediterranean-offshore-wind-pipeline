@@ -301,9 +301,16 @@ Run all checks after every `dbt build` and before any merge to main.
 ### Prerequisites
 - Docker & Docker Compose
 - Python 3.11+ with venv
-- GCP project with service account (`Storage Object Admin`,
-`BigQuery Data Editor`, `BigQuery Job User`)
-- Terraform v1.5+ — if not installed, `make infra` will install it automatically
+- Terraform v1.5+ — installed automatically by `make infra` if not found
+- GCP project with a service account key:
+  1. Go to GCP Console → IAM → Service Accounts → Create
+  2. Grant roles: `Storage Object Admin`, `BigQuery Data Editor`, `BigQuery Job User`
+  3. Create a JSON key and download it
+  4. Save it to `keys/google_credentials.json`
+  5. Generate the base64 value for `.env`:
+```bash
+     base64 -i keys/google_credentials.json | tr -d '\n'
+```
 
 ### Quick start
 ```bash

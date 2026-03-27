@@ -7,6 +7,7 @@
 #   make services       → start Kestra + dependencies via Docker Compose
 #   make wait           → wait for Kestra to be healthy
 #   make ingest         → load static reference data (bathymetry + coastline)
+#   make flow-sync      → sync flow YAML files from repo to Kestra
 #   make flow-keys      → seed 111 grid coordinates into Kestra KV store
 #                         (111 raw points — 9 inland excluded later in dbt)
 #   make flow-test      → test ingestion for one site (validates pipeline)
@@ -31,7 +32,7 @@ PIP              = $(VENV)/bin/pip
 .DEFAULT_GOAL := help
 
 .PHONY: all setup infra services wait ingest flows \
-        flow-keys flow-backfill flow-test dbt down clean help
+        flow-sync flow-keys flow-backfill flow-test dbt down clean help
 
 # ── Help ─────────────────────────────────────────────────────
 help:
@@ -43,6 +44,7 @@ help:
 	@echo "  make services       start Kestra + dependencies via Docker Compose"
 	@echo "  make wait           wait for Kestra to be healthy"
 	@echo "  make ingest         load bathymetry + coastline (~30 min)"
+	@echo "  make flow-sync      sync flow YAML files from repo to Kestra"
 	@echo "  make flow-keys      seed 111 grid coordinates into Kestra KV store"
 	@echo "  make flow-test      test ingestion for one site (run before backfill)"
 	@echo "  make flow-backfill  full historical ingestion (~2-4 hours)"
@@ -54,7 +56,7 @@ help:
 	@echo ""
 
 # ── Full pipeline ────────────────────────────────────────────
-all: setup infra services wait ingest flows dbt
+all: setup infra services wait ingest flow-sync flows dbt
 	@echo "Pipeline complete."
 
 # ── Python environment ───────────────────────────────────────
@@ -99,6 +101,19 @@ ingest:
 	$(PYTHON) scripts/load_coastline_distance.py
 	@echo "Static data loaded."
 
+# ── Sync flows from repo to Kestra ───────────────────────────
+flow-sync:
+	@echo "Syncing flows to Kestra..."
+	@for flow in flows/*.yaml; do \
+		echo "  Updating $$flow..."; \
+		curl -s -u "$(KESTRA_AUTH)" -X PUT \
+			"$(KESTRA_URL)/api/v1/flows" \
+			-H "Content-Type: application/x-yaml" \
+			--data-binary "@$$flow"; \
+		echo ""; \
+	done
+	@echo "Flows synced."
+
 # ── Kestra flows ─────────────────────────────────────────────
 flows: flow-keys flow-backfill
 	@echo "All Kestra flows triggered."
@@ -112,16 +127,17 @@ flow-keys:
 		-d '{}' | python3 -c \
 		"import sys,json; r=json.load(sys.stdin); \
 		print('  Execution ID:', r.get('id','unknown'))"
-	@echo "Waiting 30s for key values to populate..."
-	@sleep 30
+	@echo "Waiting 60s for key values to populate..."
+	@sleep 60
 
-flow-test:
+flow-test: flow-keys
 	@echo "Triggering site_data_ingestion for one site (test)..."
 	@curl -s -u "$(KESTRA_AUTH)" -X POST \
 		"$(KESTRA_URL)/api/v1/executions/$(KESTRA_NAMESPACE)/site_data_ingestion" \
-		-H "Content-Type: application/json" \
-		-d '{"inputs": {"site": "GULF_OF_LION_43.0_4.0", "start_date": "2023-01-01", "end_date": "2023-01-31"}}' \
-		| python3 -c \
+		-H "Content-Type: multipart/form-data" \
+		-F "site=GULF_OF_LION_43.0_4.0" \
+		-F "start_date=2023-01-01" \
+		-F "end_date=2023-01-31" | python3 -c \
 		"import sys,json; r=json.load(sys.stdin); \
 		print('  Execution ID:', r.get('id','unknown'))"
 	@echo "Test ingestion triggered. Check Kestra UI at $(KESTRA_URL)"
@@ -179,42 +195,7 @@ clean:
 #   (Kestra UI available at http://localhost:8080)
 #   (login: admin@wind.com / Admin1234!)
 #
-# Step 5 — load static reference data
-#   make ingest
-#   (downloads ETOPO bathymetry and Natural Earth coastline — ~30 min)
-#
-# Step 6 — seed grid coordinates into Kestra
-#   make flow-keys
-#   (seeds all 111 Gulf of Lion grid points into Kestra KV store)
-#   (note: 9 of 111 are inland — they will be excluded automatically in dbt)
-#
-# Step 7 — validate the pipeline with one site before full backfill
-#   make flow-test
-#   (ingests one site for one month — check Kestra UI to confirm it worked)
-#   (only proceed to Step 8 if this passes)
-#
-# Step 8 — run full historical backfill
-#   make flow-backfill
-#   (ingests wind + wave for all 111 sites × 19 years — takes 2-4 hours)
-#   (monitor progress at http://localhost:8080)
-#   (DO NOT run make dbt until this completes)
-#
-# Step 9 — run dbt transformations
-#   make dbt
-#   (builds all models and runs 121 tests)
-#   (expected output: 121/121 nodes passing)
-#
-# Step 10 — view results
-#   open http://localhost:8080 to see Kestra execution history
-#   open Looker Studio dashboard to see ranked sites
-#
-# ─────────────────────────────
-# SUBSEQUENT RUNS:
-#   make services   → start Kestra if stopped
-#   make dbt        → re-run transformations after data changes
-#   make down       → stop all services when done
-#
-# TROUBLESHOOTING:
-#   make flow-test  → use this to debug ingestion issues on a single site
-#   make clean      → reset venv and dbt artifacts if something breaks
-# ============================================================
+# Step 5 — sync flows from repo to Kestra
+#   make flow-sync
+#   (pushes all YAML flow definitions from flows/ into Kestra)
+#   (run this any time you update a flow file)

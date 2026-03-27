@@ -368,13 +368,18 @@ make ingest
 
 | Step | Command | Description |
 |------|---------|-------------|
-| 1 | `make flow-keys` | Seed 111 grid coordinates into KV store |
-| 2 | `make flow-test` | Optional: test one site for one month |
-| 3 | `make flow-backfill` | Full historical ingestion (~2-4 hours) |
+| 1 | `make flow-sync` | Sync flow YAML files from repo to Kestra |
+| 2 | `make flow-keys` | Seed 111 grid coordinates into KV store |
+| 3 | `make flow-test` | Optional: test one site before full backfill |
+| 4 | `make flow-backfill` | Full historical ingestion (~2-4 hours) |
 
 > The backfill ingests wind + wave data for all 111 grid points including
 > the 9 inland ones. Those 9 are excluded later in dbt — ingesting them
 > is harmless and avoids needing to pre-filter the grid.
+
+> **Note:** The Kestra KV store needs to be re-seeded any time Docker 
+> volumes are reset or Kestra is restarted from scratch. `make flow-test` 
+> does this automatically. For manual runs use `make flow-keys` first.
 
 #### 7. Run dbt transformations
 ```bash

@@ -12,24 +12,9 @@ labels:
 
 inputs:
   - id: site
-    type: SELECT
-    displayName: "Select Mediterranean basin"
-    values:
-      - "ALBORAN_SEA"
-      - "GULF_OF_VALENCIA"
-      - "EBRO_DELTA"
-      - "COSTA_BRAVA"
-      - "GULF_OF_LYON"
-      - "BALEARIC_SEA"
-      - "TYRRHENIAN_SEA"
-      - "STRAIT_OF_SICILY"
-      - "NORTH_ADRIATIC_SEA"
-      - "IONIAN_SEA"
-      - "AEGEAN_SEA"
-      - "LIBYAN_COAST"
-      - "LEVANTINE_SEA"
-      - "CYPRUS_COAST"
-    defaults: "GULF_OF_LYON"
+    type: STRING
+    displayName: "Site key"
+    defaults: "GULF_OF_LION_43.0_4.0"
 
   - id: start_date
     type: DATE

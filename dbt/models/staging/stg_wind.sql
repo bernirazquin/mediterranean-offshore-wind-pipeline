@@ -40,3 +40,8 @@ select
 
 from {{ source('med_wind_prod', 'raw_wind_data') }}
 where wind_speed_100m is not null
+
+{% if var('is_test_run', default=false) %}
+  and location_name in ('GULF_OF_LION_43.0_4.0', 'GULF_OF_LION_42.75_3.75', 'GULF_OF_LION_42.5_3.5')
+  and extract(year from observation_time) = 2023
+{% endif %}

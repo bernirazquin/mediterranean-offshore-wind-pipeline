@@ -24,6 +24,7 @@ import io
 import os
 import xarray as xr
 import pandas as pd
+import sys
 from google.cloud import bigquery, storage
 
 # ---------------------------------------------------------------------------
@@ -35,22 +36,28 @@ LAT_MIN, LAT_MAX =  30.0, 46.0
 LON_MIN, LON_MAX =  -6.0, 37.0
 
 # GCP
-PROJECT_ID  = "med-offshore-wind-489212"
-GCS_BUCKET  = "med_wind_data_lake_med-offshore-wind-489212"
+PROJECT_ID  = os.getenv("GCP_PROJECT_ID")
+GCS_BUCKET  = os.getenv("GCS_BUCKET")
 DATASET     = "med_wind_prod"
 TABLE       = "raw_bathymetry"
 TABLE_ID    = f"{PROJECT_ID}.{DATASET}.{TABLE}"
-CREDENTIALS = "keys/google_credentials.json"
+CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "keys/google_credentials.json")
+
 
 # ETOPO 2022 tiles via OPeNDAP (NOAA THREDDS server).
 # Each tile covers a 15° x 15° area. The prefix (e.g. N45E000) indicates
 # the top-left corner: N45 = lat 30-45N, E000 = lon 0-15E.
 # Together these four tiles cover the full Mediterranean bounding box.
+
+# Test mode — only download tile covering Gulf of Lion
+TEST_MODE = "--test" in sys.argv
 TILES = [
     "https://www.ngdc.noaa.gov/thredds/dodsC/global/ETOPO2022/15s/15s_surface_elev_netcdf/ETOPO_2022_v1_15s_N45W015_surface.nc",
     "https://www.ngdc.noaa.gov/thredds/dodsC/global/ETOPO2022/15s/15s_surface_elev_netcdf/ETOPO_2022_v1_15s_N45E000_surface.nc",
     "https://www.ngdc.noaa.gov/thredds/dodsC/global/ETOPO2022/15s/15s_surface_elev_netcdf/ETOPO_2022_v1_15s_N45E015_surface.nc",
     "https://www.ngdc.noaa.gov/thredds/dodsC/global/ETOPO2022/15s/15s_surface_elev_netcdf/ETOPO_2022_v1_15s_N45E030_surface.nc",
+] if not TEST_MODE else [
+    "https://www.ngdc.noaa.gov/thredds/dodsC/global/ETOPO2022/15s/15s_surface_elev_netcdf/ETOPO_2022_v1_15s_N45E000_surface.nc",
 ]
 
 # Number of latitude rows processed at a time during raster download.

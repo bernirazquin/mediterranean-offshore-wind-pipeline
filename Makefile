@@ -9,12 +9,12 @@
 #   make ingest         → load static reference data (bathymetry + coastline)
 #   make flow-sync      → sync flow YAML files from repo to Kestra
 #   make flow-keys      → seed 111 grid coordinates into Kestra KV store
-#                         (111 raw points — 9 inland excluded later in dbt)
 #   make flow-test      → test ingestion for one site (validates pipeline)
 #   make flow-backfill  → full historical ingestion (~2-4 hours)
 #   make flows          → flow-keys + flow-backfill together
-#   make dbt            → run all dbt models and tests
+#   make dbt            → run all dbt models and tests (Full Data)
 #   make all            → full pipeline from scratch
+#   make all-test       → full pipeline with minimal data (~5 min)
 #   make down           → stop all services
 #   make clean          → remove venv and dbt target
 # ============================================================
@@ -23,6 +23,15 @@
 ifneq (,$(wildcard .env))
     include .env
     export
+endif
+
+# Automation: If the credentials file exists, encode it to B64 for Kestra 
+# AND set the path for the Python SDK
+ifeq (,$(wildcard keys/google_credentials.json))
+    $(error "GCP key not found at keys/google_credentials.json. Please add it.")
+else
+    export GCP_SERVICE_ACCOUNT_B64 ?= $(shell base64 -w 0 keys/google_credentials.json)
+    export GOOGLE_APPLICATION_CREDENTIALS = $(shell pwd)/keys/google_credentials.json
 endif
 
 KESTRA_URL       = http://localhost:8080
@@ -34,36 +43,80 @@ KESTRA_AUTH      = $(KESTRA_USER):$(KESTRA_PASSWORD)
 VENV             = .venv
 PYTHON           = $(VENV)/bin/python
 PIP              = $(VENV)/bin/pip
+DBT              = $(VENV)/bin/dbt
 
 .DEFAULT_GOAL := help
 
-.PHONY: all setup infra services wait ingest flows \
-        flow-sync flow-keys flow-backfill flow-test dbt down clean help
+.PHONY: all all-test setup infra services wait ingest ingest-test flows \
+        flow-sync flow-keys flow-backfill flow-test flow-mini dbt dbt-test down clean help
 
 # ── Help ─────────────────────────────────────────────────────
 help:
 	@echo ""
 	@echo "Gulf of Lion — Offshore Wind Pipeline"
 	@echo "======================================"
-	@echo "  make setup          create venv and install dependencies"
-	@echo "  make infra          provision GCP infrastructure via Terraform"
-	@echo "  make services       start Kestra + dependencies via Docker Compose"
-	@echo "  make wait           wait for Kestra to be healthy"
-	@echo "  make ingest         load bathymetry + coastline (~30 min)"
-	@echo "  make flow-sync      sync flow YAML files from repo to Kestra"
-	@echo "  make flow-keys      seed 111 grid coordinates into Kestra KV store"
-	@echo "  make flow-test      test ingestion for one site (run before backfill)"
-	@echo "  make flow-backfill  full historical ingestion (~2-4 hours)"
-	@echo "  make flows          flow-keys + flow-backfill together"
-	@echo "  make dbt            run all dbt models and tests"
-	@echo "  make all            full pipeline from scratch"
-	@echo "  make down           stop all services"
-	@echo "  make clean          remove venv and dbt target"
+	@echo "  make setup         create venv and install dependencies"
+	@echo "  make infra         provision GCP infrastructure via Terraform"
+	@echo "  make services      start Kestra + dependencies via Docker Compose"
+	@echo "  make wait          wait for Kestra to be healthy"
+	@echo "  make ingest        load bathymetry + coastline (~30 min)"
+	@echo "  make ingest-test   load test data for ingestion testing (Gulf of Lion only)"
+	@echo "  make flow-sync     sync flow YAML files from repo to Kestra"
+	@echo "  make flow-keys     seed 111 grid coordinates into Kestra KV store"
+	@echo "  make flow-test     test ingestion for one site (run before backfill)"
+	@echo "  make flow-backfill full historical ingestion (~2-4 hours)"
+	@echo "  make flows         flow-keys + flow-backfill together"
+	@echo "  make dbt           run all dbt models and tests (Full Data)"
+	@echo "  make dbt-test      run dbt models for test data (Minimal Data)"
+	@echo "  make all           full pipeline from scratch"
+	@echo "  make all-test      full pipeline with minimal data (~5 min)"
+	@echo "  make down          stop all services"
+	@echo "  make clean         remove venv and dbt target"
 	@echo ""
 
 # ── Full pipeline ────────────────────────────────────────────
 all: setup infra services wait ingest flow-sync flows dbt
 	@echo "Pipeline complete."
+
+# ── Full test pipeline (under 5 min) ─────────────────────────
+all-test: setup infra services wait flow-sync ingest-test flow-mini dbt-test
+	@echo "Test pipeline complete. To run full dataset: run 'make all' instead."
+
+ingest-test:
+	@echo "Loading static reference data in test mode (Gulf of Lion only)..."
+	$(PYTHON) scripts/load_bathymetry.py --test
+	$(PYTHON) scripts/load_coastline_distance.py --test
+	@echo "Static data loaded."
+
+# ── Seed Kestra with .env values + Site Coordinates ──────────
+flow-keys:
+	@echo "Pushing configuration to Kestra KV store..."
+	@curl -s -u "$(KESTRA_AUTH)" -X PUT $(KESTRA_URL)/api/v1/kvs/$(KESTRA_NAMESPACE)/gcs_bucket -d "$(GCS_BUCKET)" -H "Content-Type: text/plain"
+	@curl -s -u "$(KESTRA_AUTH)" -X PUT $(KESTRA_URL)/api/v1/kvs/$(KESTRA_NAMESPACE)/gcp_project_id -d "$(GCP_PROJECT_ID)" -H "Content-Type: text/plain"
+	@echo "Seeding 111 grid coordinates into Kestra..."
+	@curl -s -u "$(KESTRA_AUTH)" -X POST \
+		"$(KESTRA_URL)/api/v1/executions/$(KESTRA_NAMESPACE)/site_key_values" \
+		-H "Content-Type: application/json" -d '{}' | python3 -c \
+		"import sys,json; r=json.load(sys.stdin); print('  Execution ID:', r.get('id','unknown'))"
+	@echo "Waiting 30s for coordinate seeding to finish..."
+	@sleep 30
+
+# ── Trigger 3-Site Test ──────────────────────────────────────
+flow-mini: flow-keys
+	@echo "Triggering mini ingestion — 3 sites x 1 year..."
+	@for site in "GULF_OF_LION_43.0_4.0" "GULF_OF_LION_42.75_3.75" "GULF_OF_LION_42.5_3.5"; do \
+		echo "  Ingesting $$site..."; \
+		curl -s -u "$(KESTRA_AUTH)" -X POST \
+			"$(KESTRA_URL)/api/v1/executions/$(KESTRA_NAMESPACE)/site_data_ingestion" \
+			-H "Content-Type: multipart/form-data" \
+			-F "site=$$site" \
+			-F "start_date=2023-01-01" \
+			-F "end_date=2023-12-31" | python3 -c \
+			"import sys,json; r=json.load(sys.stdin); print('  Execution ID:', r.get('id','unknown'))"; \
+	done
+	@echo "Waiting 180s for ingestion to complete..."
+	@sleep 180
+	@echo "Mini ingestion complete."
 
 # ── Python environment ───────────────────────────────────────
 setup:
@@ -76,22 +129,24 @@ setup:
 # ── Infrastructure ───────────────────────────────────────────
 infra:
 	@echo "Checking for GCP credentials..."
-	@test -f keys/google_credentials.json || \
-		(echo "ERROR: keys/google_credentials.json not found." && \
-		echo "  See README.md for setup instructions." && \
-		exit 1)
-	@echo "Provisioning infrastructure..."
-	@which terraform > /dev/null 2>&1 || (echo "Terraform not found. Installing..." && \
-		wget -q https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip -O /tmp/terraform.zip && \
-		unzip -q /tmp/terraform.zip -d /tmp/terraform-bin && \
-		sudo mv /tmp/terraform-bin/terraform /usr/local/bin/ && \
-		rm -rf /tmp/terraform.zip /tmp/terraform-bin && \
-		echo "Terraform installed.")
-	cd terraform && terraform init && terraform apply -auto-approve \
+	@test -f keys/google_credentials.json || (echo "ERROR: Key missing"; exit 1)
+	
+	@echo "Syncing Terraform state with GCP..."
+	@cd terraform && terraform init > /dev/null
+	
+	# If the dataset exists but isn't in state, import it silently
+	-@cd terraform && terraform import \
 		-var="project=$(GCP_PROJECT_ID)" \
-		-var="gcs_bucket_name=med_wind_data_lake_$(GCP_PROJECT_ID)" \
+		-var="gcs_bucket_name=$(GCS_BUCKET)" \
+		-var="credentials=../keys/google_credentials.json" \
+		google_bigquery_dataset.dataset \
+		projects/$(GCP_PROJECT_ID)/datasets/med_wind_prod 2>/dev/null || true
+
+	@echo "Provisioning infrastructure..."
+	cd terraform && terraform apply -auto-approve \
+		-var="project=$(GCP_PROJECT_ID)" \
+		-var="gcs_bucket_name=$(GCS_BUCKET)" \
 		-var="credentials=../keys/google_credentials.json"
-	@echo "Done."
 
 # ── Services ─────────────────────────────────────────────────
 services:
@@ -121,6 +176,7 @@ ingest:
 	$(PYTHON) scripts/load_coastline_distance.py
 	@echo "Static data loaded."
 
+
 # ── Sync flows from repo to Kestra ───────────────────────────
 flow-sync:
 	@echo "Syncing flows to Kestra..."
@@ -129,8 +185,8 @@ flow-sync:
 		curl -s -u "$(KESTRA_AUTH)" -X PUT \
 			"$(KESTRA_URL)/api/v1/flows" \
 			-H "Content-Type: application/x-yaml" \
-			--data-binary "@$$flow"; \
-		echo ""; \
+			--data-binary "@$$flow" > /dev/null; \
+		echo "  Done."; \
 	done
 	@echo "Flows synced."
 
@@ -140,7 +196,6 @@ flows: flow-keys flow-backfill
 
 flow-keys:
 	@echo "Seeding 111 grid coordinates into Kestra KV store..."
-	@echo "Note: 9 of 111 points are inland and will be excluded in dbt."
 	@curl -s -u "$(KESTRA_AUTH)" -X POST \
 		"$(KESTRA_URL)/api/v1/executions/$(KESTRA_NAMESPACE)/site_key_values" \
 		-H "Content-Type: application/json" \
@@ -164,7 +219,6 @@ flow-test: flow-keys
 
 flow-backfill:
 	@echo "Triggering site_data_backfill (~2-4 hours)..."
-	@echo "This ingests wind + wave data for all 111 sites × 19 years."
 	@curl -s -u "$(KESTRA_AUTH)" -X POST \
 		"$(KESTRA_URL)/api/v1/executions/$(KESTRA_NAMESPACE)/site_data_backfill" \
 		-H "Content-Type: application/json" \
@@ -172,17 +226,18 @@ flow-backfill:
 		"import sys,json; r=json.load(sys.stdin); \
 		print('  Execution ID:', r.get('id','unknown'))"
 	@echo "Backfill triggered. Monitor at $(KESTRA_URL)"
-	@echo "Run 'make dbt' after the backfill completes."
 
 # ── dbt ──────────────────────────────────────────────────────
 dbt:
 	@echo "Running dbt pipeline..."
-	cd dbt && \
-		dbt deps && \
-		dbt seed && \
-		dbt build --full-refresh
+	cd dbt && $(DBT) deps && $(DBT) seed && $(DBT) build --full-refresh
 	@echo "dbt complete. Expected: 121/121 nodes passing."
 
+dbt-test:
+	@echo "Running dbt pipeline in TEST mode..."
+	cd dbt && $(DBT) deps && $(DBT) seed && \
+		$(DBT) build --full-refresh --vars 'is_test_run: true'
+	@echo "dbt test complete."
 # ── Cleanup ──────────────────────────────────────────────────
 clean:
 	@echo "Cleaning up..."
@@ -196,81 +251,34 @@ clean:
 # STEP BY STEP GUIDE FOR NEW CONTRIBUTORS
 # ============================================================
 #
-# FIRST TIME SETUP (run once):
+# 🚀 SHORTCUT: THE 5-MINUTE SMOKE TEST
 # ─────────────────────────────
-# Step 1 — fill in your credentials
-#   cp .env.example .env
-#   (edit .env with your GCP project ID, service account, bucket name)
-#   Place your GCP service account JSON key at keys/google_credentials.json
+# If you want to see the entire stack working without waiting hours:
+# 1. cp .env.example .env (and fill in your GCP details)
+# 2. Place GCP JSON key in keys/google_credentials.json
+# 3. Run: make all-test
+# 
+# This command automatically performs:
+# - Python setup & Infrastructure provisioning
+# - Kestra startup & Flow synchronization
+# - Minimal bathymetry/coastline ingestion (Gulf of Lion only)
+# - Ingestion of 3 sites for the year 2023
+# - dbt transformation on the filtered 2023 dataset
 #
-# Step 2 — set up Python environment
-#   make setup
+# 🏗️ FULL PRODUCTION DEPLOYMENT
+# ─────────────────────────────
+# Step 1 — set up environment & infra
+#   make setup && make infra
 #
-# Step 3 — provision GCP infrastructure
-#   make infra
-#   (installs Terraform if needed, creates GCS bucket and BigQuery datasets)
-#   (uses GCP_PROJECT_ID from .env automatically)
+# Step 2 — start Kestra
+#   make services && make wait
 #
-# Step 4 — start Kestra
-#   make services
-#   make wait
-#   (Kestra UI available at http://localhost:8080)
-#   (login: admin@wind.com / Admin1234!)
+# Step 3 — sync flows & load full static data (~30 min)
+#   make flow-sync && make ingest
 #
-# Step 5 — sync flows from repo to Kestra
-#   make flow-sync
-#   (pushes all YAML flow definitions from flows/ into Kestra)
-#   (run this any time you update a flow file)
+# Step 4 — seed grid & run full backfill (~2-4 hours)
+#   make flow-keys && make flow-backfill
 #
-# Step 6 — load static reference data
-#   make ingest
-#   (downloads ETOPO bathymetry and Natural Earth coastline — ~30 min)
-#
-# Step 7 — seed grid coordinates into Kestra
-#   make flow-keys
-#   (seeds all 111 Gulf of Lion grid points into Kestra KV store)
-#   (note: 9 of 111 are inland — excluded automatically in dbt)
-#   (re-run this any time Docker volumes are reset or Kestra is restarted)
-#
-# Step 8 — validate the pipeline with one site before full backfill
-#   make flow-test
-#   (seeds KV store automatically, then ingests one site for one month)
-#   (check Kestra UI at http://localhost:8080 to confirm it worked)
-#   (only proceed to Step 9 if this passes)
-#
-# Step 9 — run full historical backfill
-#   make flow-backfill
-#   (ingests wind + wave for all 111 sites × 19 years — takes 2-4 hours)
-#   (monitor progress at http://localhost:8080)
-#   (DO NOT run make dbt until this completes)
-#
-# Step 10 — run dbt transformations
+# Step 5 — run dbt transformations
 #   make dbt
-#   (builds all models and runs 121 tests)
-#   (expected output: 121/121 nodes passing)
-#
-# Step 11 — view results
-#   open http://localhost:8080 to see Kestra execution history
-#   open Looker Studio dashboard to see ranked sites
-#
-# ─────────────────────────────
-# SHORTCUT — skip ingestion (data already in BigQuery):
-#   make setup
-#   make services
-#   make wait
-#   make flow-sync
-#   make dbt
-#
-# ─────────────────────────────
-# SUBSEQUENT RUNS:
-#   make services    → start Kestra if stopped
-#   make flow-sync   → update flows after editing YAML files
-#   make flow-keys   → re-seed KV store if Docker was restarted
-#   make dbt         → re-run transformations after data changes
-#   make down        → stop all services when done
-#
-# TROUBLESHOOTING:
-#   make flow-test   → use this to debug ingestion issues on a single site
-#   make flow-sync   → run this if flows in Kestra UI don't match repo files
-#   make clean       → reset venv and dbt artifacts if something breaks
 # ============================================================

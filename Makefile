@@ -70,6 +70,12 @@ setup:
 # ── Infrastructure ───────────────────────────────────────────
 infra:
 	@echo "Provisioning infrastructure..."
+	@which terraform > /dev/null 2>&1 || (echo "Terraform not found. Installing..." && \
+		wget -q https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip && \
+		unzip -q terraform_1.5.7_linux_amd64.zip && \
+		sudo mv terraform /usr/local/bin/ && \
+		rm terraform_1.5.7_linux_amd64.zip && \
+		echo "Terraform installed.")
 	cd terraform && terraform init && terraform apply -auto-approve
 	@echo "Done."
 

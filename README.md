@@ -298,11 +298,12 @@ Run all checks after every `dbt build` and before any merge to main.
 ## How to Reproduce
 
 ### Prerequisites
+### Prerequisites
 - Docker & Docker Compose
-- Terraform v1.5+
 - Python 3.11+ with venv
 - GCP project with service account (`Storage Object Admin`,
 `BigQuery Data Editor`, `BigQuery Job User`)
+- Terraform v1.5+ — if not installed, `make infra` will install it automatically
 
 ### Quick start
 ```bash

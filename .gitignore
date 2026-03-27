@@ -45,8 +45,8 @@ wind_db_data/
 storage/
 
 # === Cloud & Security ===
-keys/
-*.json
+keys/*.json
+!keys/README.md
 .gcp/
 .env
 .envrc

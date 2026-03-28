@@ -11,6 +11,7 @@ Run from project root: python scripts/load_coastline_distance.py
 """
 
 import io, requests
+import os, sys
 import numpy as np
 import pandas as pd
 import geopandas as gpd
@@ -21,13 +22,19 @@ LAT_MIN, LAT_MAX = 30.0, 46.0
 LON_MIN, LON_MAX = -6.0, 37.0
 RESOLUTION       = 15 / 3600
 STRIP_SIZE       = 200
-PROJECT_ID       = "med-offshore-wind-489212"
-GCS_BUCKET       = "med_wind_data_lake_med-offshore-wind-489212"
-TABLE_ID         = f"{PROJECT_ID}.med_wind_prod.raw_coastline_distance"
-CREDENTIALS      = "keys/google_credentials.json"
+PROJECT_ID  = os.getenv("GCP_PROJECT_ID")
+GCS_BUCKET  = os.getenv("GCS_BUCKET")
+TABLE_ID    = f"{PROJECT_ID}.med_wind_prod.raw_coastline_distance"
+CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "keys/google_credentials.json")
 GCS_PREFIX       = "raw/coastline_distance"
 GCS_URI          = f"gs://{GCS_BUCKET}/{GCS_PREFIX}/strip_*.parquet"
 NE_URL           = "https://naciscdn.org/naturalearth/10m/physical/ne_10m_coastline.zip"
+
+TEST_MODE = "--test" in sys.argv
+# In test mode narrow bounding box to Gulf of Lion only
+if TEST_MODE:
+    LAT_MIN, LAT_MAX = 41.0, 44.0
+    LON_MIN, LON_MAX =  2.0,  6.5
 
 LAT_MEAN     = (LAT_MIN + LAT_MAX) / 2
 KM_PER_LAT   = RESOLUTION * 111.0

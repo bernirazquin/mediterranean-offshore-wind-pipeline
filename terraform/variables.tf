@@ -1,11 +1,11 @@
 variable "credentials" {
   description = "credential file path for google cloud authentication"
-  default     = "/workspaces/mediterranean-offshore-wind-pipeline/keys/google_credentials.json"
+  default     = "./keys/google_credentials.json"
 }
 
 variable "project" {
   description = "The unique GCP Project ID"
-  default     = "med-offshore-wind-489212"
+  default     = ""
 }
 
 variable "region" {
@@ -20,7 +20,7 @@ variable "location" {
 
 variable "gcs_bucket_name" {
   description = "Unique name for the GCS Bucket (Data Lake)"
-  default     = "med_wind_data_lake" 
+  default     = ""
 }
 
 variable "bq_dataset_id" {

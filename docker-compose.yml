@@ -1,44 +1,10 @@
 volumes:
-  wind_db_data:
-    driver: local
   kestra_db_data:
     driver: local
   kestra_storage:
     driver: local
 
 services:
-  #Data warehouse
-  pgdatabase:
-    image: postgres:18
-    environment:
-      POSTGRES_USER: root
-      POSTGRES_PASSWORD: root
-      POSTGRES_DB: med_wind
-    ports:
-      - "5432:5432"
-    volumes:
-      - wind_db_data:/var/lib/postgresql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -d med_wind -U root"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-
-  #Database administration UI 
-  pgadmin:
-    image: dpage/pgadmin4
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@admin.com
-      PGADMIN_DEFAULT_PASSWORD: root
-    ports:
-      - "8085:80"
-    depends_on:
-      pgdatabase:
-        condition: service_healthy
-      kestra:
-        condition: service_healthy
-
   #Kestra internal engine database
   kestra_postgres:
     image: postgres:18
@@ -62,8 +28,7 @@ services:
     volumes:
       - kestra_storage:/app/storage
       - /var/run/docker.sock:/var/run/docker.sock
-      - /tmp/tmp/kestra-wd:/tmp/kestra-wd
-      - /workspaces/mediterranean-offshore-wind-pipeline/keys/google_credentials.json
+      - /tmp/kestra-wd:/tmp/kestra-wd
     
     env_file:
       - .env
@@ -100,7 +65,7 @@ services:
           ai:
             type: gemini
             gemini:
-              model-name: gemini-3-flash
+              model-name: gemini-2.0-flash
               api-key: ${GEMINI_API_KEY}
           tasks:
             tmpDir:

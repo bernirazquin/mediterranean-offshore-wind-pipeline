@@ -57,6 +57,7 @@ target/
 dbt_packages/
 dbt_modules/
 logs/
+dbt/.user.yml
 
 # === Testing & Tools ===
 .pytest_cache/

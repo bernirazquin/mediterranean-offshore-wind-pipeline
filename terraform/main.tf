@@ -15,11 +15,11 @@ provider "google" {
 
 # Data Lake: Google Cloud Storage Bucket (raw data)
 resource "google_storage_bucket" "data-lake-bucket" {
-  # Concatenating project ID to ensure global uniqueness
-  name          = "${var.gcs_bucket_name}_${var.project}"
+  name          = var.gcs_bucket_name
   location      = var.location
   force_destroy = true
 
+  
   lifecycle_rule {
     condition {
       age = 1

@@ -2,12 +2,14 @@ version: 2
 
 sources:
   - name: med_wind_prod
-    database: med-offshore-wind-489212
+    database: "{{ env_var('GCP_PROJECT_ID') }}" # Use env var for portability
     schema: med_wind_prod
-
     tables:
       - name: raw_wind_data
+        description: "Hourly ERA5 wind data at 10m and 100m"
       - name: raw_wave_data
+        description: "Hourly Marine API wave height, direction and period"
       - name: raw_bathymetry
+        description: "ETOPO 2022 bathymetry pixels"
       - name: raw_coastline_distance
-      - name: raw_site_boundaries
+        description: "Calculated distance to nearest Natural Earth coastline"

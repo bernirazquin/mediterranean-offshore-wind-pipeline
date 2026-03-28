@@ -1,0 +1,21 @@
+id: site_data_test
+namespace: company.wind
+description: "Minimal ingestion for CI/CD testing: 3 sites, 1 year"
+
+tasks:
+  - id: mini_loop
+    type: io.kestra.plugin.core.flow.EachParallel
+    value:
+      - "GULF_OF_LION_43.0_4.0"
+      - "GULF_OF_LION_42.75_3.75"
+      - "GULF_OF_LION_42.5_3.5"
+    tasks:
+      - id: run_ingestion
+        type: io.kestra.plugin.core.flow.Subflow
+        flowId: site_data_ingestion
+        namespace: company.wind
+        inputs:
+          site: "{{ taskrun.value }}"
+          start_date: "2023-01-01"
+          end_date: "2023-12-31"
+        wait: true

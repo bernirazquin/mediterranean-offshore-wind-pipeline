@@ -77,8 +77,9 @@ Natural Earth   ──┘
 | Bathymetry | [ETOPO 2022 (NOAA)](https://www.ncei.noaa.gov/products/etopo-global-relief-model) | NetCDF via OPeNDAP | ~450m resolution · global |
 | Coastline | [Natural Earth 1:10m Physical Vectors](https://www.naturalearthdata.com/downloads/10m-physical-vectors/) | Shapefile | Global coastline |
 
-All data is free and publicly available. No API keys are required. Open-Meteo does not 
-require authentication for historical reanalysis data.
+All data is free and publicly available. Open-Meteo does not require authentication for
+historical reanalysis data. `GEMINI_API_KEY` in `.env.example` is optional — it enables
+Kestra's AI assist feature and has no effect on the pipeline.
 
 ---
 
@@ -216,8 +217,8 @@ Physical gates applied before ranking:
 
 Turbine classification:
 - `depth_m <= 50` → fixed
-- `50 < depth_m <= 300` → floating
-- `depth_m > 300` → not viable (excluded from ranking)
+- `50 < depth_m <= 1000` → floating
+- `depth_m > 1000` → not viable (excluded from ranking)
 
 ### BigQuery tables
 
@@ -298,13 +299,12 @@ Run all checks after every `dbt build` and before any merge to main.
 ## How to Reproduce
 
 ### Prerequisites
-### Prerequisites
 - Docker & Docker Compose
 - Python 3.11+ with venv
 - Terraform v1.5+ — installed automatically by `make infra` if not found
 - GCP project with a service account key:
   1. Go to GCP Console → IAM → Service Accounts → Create
-  2. Grant roles: `Storage Object Admin`, `BigQuery Data Editor`, `BigQuery Job User`
+  2. Grant roles: `Storage Admin`, `Storage Object Admin`, `BigQuery Data Editor`, `BigQuery Job User`
   3. Create a JSON key and download it
   4. Save it to `keys/google_credentials.json`
   5. Generate the base64 value for `.env`:
@@ -312,23 +312,38 @@ Run all checks after every `dbt build` and before any merge to main.
      base64 -i keys/google_credentials.json | tr -d '\n'
 ```
 
-### Quick start
+### ⚡ Run this first — 5-10 minute smoke test
+
+Before running the full 4-hour pipeline, verify the entire stack works end-to-end with minimal data:
+
+```bash
+cp .env.example .env    # fill in GCP_PROJECT_ID, GCS_BUCKET, GCP_SERVICE_ACCOUNT_B64
+make all-test
+```
+
+This runs the complete pipeline on 3 sites × 1 year and all 122 dbt tests. If this passes, `make all` will work.
+
+### Full pipeline
+
+Once `make all-test` passes, run the full historical ingestion (~2-4 hours):
+
+```bash
+make all
+```
+
+Or step by step:
 ```bash
 cp .env.example .env    # fill in your GCP credentials
 make setup              # Python environment
 make infra              # Terraform — provision GCP resources
 make services           # Docker Compose — start Kestra
 make wait               # wait for Kestra to be healthy
+make flow-sync          # sync flow YAML files to Kestra
 make ingest             # load bathymetry + coastline (~30 min)
 make flow-keys          # seed 111 grid coordinates into Kestra KV store
 make flow-test          # optional: test one site before full backfill
 make flow-backfill      # full historical ingestion (~2-4 hours)
 make dbt                # run all dbt models and tests
-```
-
-Or run everything at once after filling `.env`:
-```bash
-make all
 ```
 
 Type `make` with no arguments to see all available commands.
@@ -360,12 +375,12 @@ make services
 ```
 Kestra UI → http://localhost:8080 (`admin@wind.com` / `Admin1234!`)
 
-#### 4. Generate grid points
+#### 4. Set up Python environment
 ```bash
 make setup
-export GCP_PROJECT_ID=your-project-id
-python scripts/generate_grid.py
 ```
+
+> `generate_grid.py` is a development utility used to generate `site_key_values.yaml` and `grid_points.json`. It is not needed to reproduce the pipeline — the grid is already encoded in the flow.
 
 #### 5. Load static reference data
 ```bash
@@ -393,11 +408,11 @@ make ingest
 ```bash
 make dbt
 ```
-Expected output: 121/121 nodes passing.
+Expected output: 122/122 nodes passing.
 
 #### 8. View dashboard
 Open the
-[Looker Studio dashboard](YOUR_LOOKER_STUDIO_LINK_HERE)
+[Looker Studio dashboard](https://lookerstudio.google.com/s/ljbPw5trmGA)
 or connect your own Looker Studio instance to
 `mart_offshore_site_prioritization` and `mart_offshore_site_gis`
 in BigQuery.

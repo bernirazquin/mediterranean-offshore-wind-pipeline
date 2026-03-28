@@ -18,23 +18,23 @@ Every site should be traceable from source to mart. Any drop must be explainable
 ```sql
 -- Should be 102 (9 land cells filtered at int_site_centers via bathymetry join)
 SELECT COUNT(DISTINCT site_name) AS site_count
-FROM `med-offshore-wind-489212.wind_intermediate.int_site_centers`;
+FROM `med-offshore-test.wind_intermediate.int_site_centers`;
 
 -- Should be 102 (all marine points scored, no drops from joins)
 SELECT COUNT(*) AS site_count
-FROM `med-offshore-wind-489212.wind_intermediate.int_site_composite_score_unfiltered`;
+FROM `med-offshore-test.wind_intermediate.int_site_composite_score_unfiltered`;
 
 -- Should be < 102 (viable sites only after hard gates)
 SELECT COUNT(*) AS site_count
-FROM `med-offshore-wind-489212.wind_intermediate.int_site_composite_score`;
+FROM `med-offshore-test.wind_intermediate.int_site_composite_score`;
 
 -- Should match composite score count
 SELECT COUNT(*) AS site_count
-FROM `med-offshore-wind-489212.wind_marts.mart_offshore_site_prioritization`;
+FROM `med-offshore-test.wind_marts.mart_offshore_site_prioritization`;
 
 -- Should be 102 (full export for GIS)
 SELECT COUNT(*) AS site_count
-FROM `med-offshore-wind-489212.wind_marts.mart_offshore_site_gis`;
+FROM `med-offshore-test.wind_marts.mart_offshore_site_gis`;
 ```
 
 **Note:** The original wind grid had 111 points. 9 were confirmed land cells with zero marine bathymetry samples and are excluded at `int_site_centers`. This is expected and correct.
@@ -42,19 +42,10 @@ FROM `med-offshore-wind-489212.wind_marts.mart_offshore_site_gis`;
 ### 1.2 — Viability breakdown (understand what was eliminated and why)
 
 ```sql
-WITH binned_data AS (
-    SELECT
-        final_score,
-        ntile(10) OVER (ORDER BY final_score) AS decile
-    FROM `med-offshore-wind-489212.wind_intermediate.int_site_composite_score`
-)
-
 SELECT
-    decile,
-    round(min(final_score), 3) as min_score,
-    round(max(final_score), 3) as max_score,
-    count(*) as site_count
-FROM binned_data
+    viability_flag,
+    COUNT(*) AS site_count
+FROM `med-offshore-test.wind_marts.mart_offshore_site_gis`
 GROUP BY 1
 ORDER BY 1;
 ```
@@ -76,7 +67,7 @@ SELECT
     ROUND(AVG(depth_m), 2) AS avg_depth_m,
     ROUND(MIN(depth_m), 2) AS min_depth_m,
     ROUND(MAX(depth_m), 2) AS max_depth_m
-FROM `med-offshore-wind-489212.wind_intermediate.int_site_composite_score_unfiltered`
+FROM `med-offshore-test.wind_intermediate.int_site_composite_score_unfiltered`
 GROUP BY 1
 ORDER BY 1;
 ```
@@ -96,7 +87,7 @@ SELECT
     COUNT(*) AS total,
     COUNTIF(site_rank IS NULL) AS null_rank,
     COUNTIF(site_rank IS NOT NULL) AS has_rank
-FROM `med-offshore-wind-489212.wind_marts.mart_offshore_site_gis`
+FROM `med-offshore-test.wind_marts.mart_offshore_site_gis`
 GROUP BY 1
 ORDER BY 1;
 ```
@@ -118,7 +109,7 @@ SELECT
     MAX(center_lat) AS max_lat,
     MIN(center_lon) AS min_lon,
     MAX(center_lon) AS max_lon
-FROM `med-offshore-wind-489212.wind_intermediate.int_site_composite_score_unfiltered`;
+FROM `med-offshore-test.wind_intermediate.int_site_composite_score_unfiltered`;
 ```
 
 **Expected:** All sites within Gulf of Lion bounds. Any site outside is a data error.
@@ -134,7 +125,7 @@ SELECT
     MIN(depth_m)            AS min_depth,
     MAX(depth_m)            AS max_depth,
     ROUND(AVG(depth_m), 2)  AS avg_depth
-FROM `med-offshore-wind-489212.wind_intermediate.int_site_composite_score_unfiltered`;
+FROM `med-offshore-test.wind_intermediate.int_site_composite_score_unfiltered`;
 ```
 
 **Expected:** No negative depths. No zeros. Max depth plausible for Mediterranean (~2800m).
@@ -149,7 +140,7 @@ SELECT
     MIN(distance_to_coast_km)            AS min_dist,
     MAX(distance_to_coast_km)            AS max_dist,
     ROUND(AVG(distance_to_coast_km), 2)  AS avg_dist
-FROM `med-offshore-wind-489212.wind_intermediate.int_site_composite_score_unfiltered`;
+FROM `med-offshore-test.wind_intermediate.int_site_composite_score_unfiltered`;
 ```
 
 **Expected:** All values > 0. Nothing over ~200km.
@@ -168,7 +159,7 @@ SELECT
     distance_to_coast_km,
     final_score,
     viability_flag
-FROM `med-offshore-wind-489212.wind_marts.mart_offshore_site_gis`
+FROM `med-offshore-test.wind_marts.mart_offshore_site_gis`
 WHERE viability_flag = 'viable'
   AND (
       depth_m BETWEEN 10 AND 20
@@ -208,7 +199,7 @@ SELECT
     ROUND(AVG(final_score), 3)      AS final_avg,
     ROUND(STDDEV(final_score), 3)   AS final_stddev
 
-FROM `med-offshore-wind-489212.wind_intermediate.int_site_composite_score`;
+FROM `med-offshore-test.wind_intermediate.int_site_composite_score`;
 ```
 
 **Expected:**
@@ -219,12 +210,18 @@ FROM `med-offshore-wind-489212.wind_intermediate.int_site_composite_score`;
 ### 3.2 — Score histogram (decile breakdown)
 
 ```sql
+WITH binned AS (
+    SELECT
+        final_score,
+        NTILE(10) OVER (ORDER BY final_score) AS decile
+    FROM `med-offshore-test.wind_intermediate.int_site_composite_score`
+)
 SELECT
-    NTILE(10) OVER (ORDER BY final_score) AS decile,
+    decile,
     ROUND(MIN(final_score), 3) AS min_score,
     ROUND(MAX(final_score), 3) AS max_score,
     COUNT(*) AS site_count
-FROM `med-offshore-wind-489212.wind_intermediate.int_site_composite_score`
+FROM binned
 GROUP BY 1
 ORDER BY 1;
 ```
@@ -240,7 +237,7 @@ SELECT
     COUNTIF(wave_score = 0.0)    AS wave_at_floor,
     COUNTIF(wind_score = 0.0)    AS wind_at_floor,
     COUNT(*) AS total_sites
-FROM `med-offshore-wind-489212.wind_intermediate.int_site_composite_score`;
+FROM `med-offshore-test.wind_intermediate.int_site_composite_score`;
 ```
 
 **Expected:** A few sites hitting ceiling/floor is fine. More than 20% hitting any ceiling or floor means the scoring curve threshold needs adjusting.
@@ -255,7 +252,7 @@ The Gulf of Lion is dominated by the Mistral — wind and wave conditions are co
 SELECT
     ROUND(CORR(wind_score, wave_score), 3)               AS wind_wave_score_corr,
     ROUND(CORR(avg_wind_speed_ms, avg_wave_height_m), 3) AS windspeed_waveheight_corr
-FROM `med-offshore-wind-489212.wind_intermediate.int_site_composite_score`;
+FROM `med-offshore-test.wind_intermediate.int_site_composite_score`;
 ```
 
 **Interpretation:**
@@ -275,7 +272,7 @@ SELECT
     ROUND(AVG(raw_final_score), 3)          AS avg_raw_score,
     ROUND(AVG(final_score), 3)              AS avg_final_score,
     ROUND(AVG(survivability_multiplier), 3) AS avg_multiplier
-FROM `med-offshore-wind-489212.wind_intermediate.int_site_composite_score`
+FROM `med-offshore-test.wind_intermediate.int_site_composite_score`
 GROUP BY 1, 2
 ORDER BY 1, 2;
 ```
@@ -292,7 +289,7 @@ SELECT
     ROUND(raw_final_score, 3)               AS raw_final_score,
     ROUND(final_score, 3)                   AS final_score,
     ROUND(raw_final_score - final_score, 3) AS score_lost_to_penalty
-FROM `med-offshore-wind-489212.wind_intermediate.int_site_composite_score`
+FROM `med-offshore-test.wind_intermediate.int_site_composite_score`
 WHERE survivability_multiplier < 1.0
 ORDER BY score_lost_to_penalty DESC;
 ```
@@ -314,7 +311,7 @@ SELECT
     ROUND(AVG(spatial_score), 3)        AS avg_spatial_score,
     ROUND(AVG(depth_score), 3)          AS avg_depth_score,
     ROUND(AVG(coast_score), 3)          AS avg_coast_score
-FROM `med-offshore-wind-489212.wind_intermediate.int_site_spatial_score`
+FROM `med-offshore-test.wind_intermediate.int_site_spatial_score`
 WHERE turbine_type != 'not_viable'
 GROUP BY 1
 ORDER BY 1;
@@ -348,7 +345,7 @@ SELECT
     survivability_multiplier,
     ROUND(raw_final_score, 3) AS raw_final_score,
     ROUND(final_score, 3)     AS final_score
-FROM `med-offshore-wind-489212.wind_marts.mart_offshore_site_prioritization`
+FROM `med-offshore-test.wind_marts.mart_offshore_site_prioritization`
 ORDER BY site_rank ASC
 LIMIT 10;
 ```
@@ -371,7 +368,7 @@ SELECT
     ROUND(wave_score, 3)     AS wave_score,
     survivability_class,
     ROUND(final_score, 3)    AS final_score
-FROM `med-offshore-wind-489212.wind_marts.mart_offshore_site_prioritization`
+FROM `med-offshore-test.wind_marts.mart_offshore_site_prioritization`
 ORDER BY site_rank DESC
 LIMIT 10;
 ```
@@ -398,7 +395,7 @@ SELECT
         (0.33 * spatial_score) + (0.34 * wind_score) + (0.33 * wave_score) DESC
     ) AS alt_rank_equal,
     ROUND(final_score, 3) AS final_score
-FROM `med-offshore-wind-489212.wind_intermediate.int_site_composite_score`
+FROM `med-offshore-test.wind_intermediate.int_site_composite_score`
 ORDER BY current_rank_40_40_20 ASC
 LIMIT 20;
 ```
@@ -418,7 +415,7 @@ SELECT
     turbine_type,
     depth_m,
     distance_to_coast_km
-FROM `med-offshore-wind-489212.wind_intermediate.int_site_composite_score`
+FROM `med-offshore-test.wind_intermediate.int_site_composite_score`
 WHERE depth_m < 10
    OR depth_m > 1000
    OR (turbine_type = 'fixed'    AND distance_to_coast_km < 11)
@@ -454,7 +451,7 @@ To be completed in QGIS with a high-resolution land mask.
 - [ ] Load Natural Earth 1:10m land polygons: https://www.naturalearthdata.com/downloads/10m-physical-vectors/
 - [ ] Run Vector → Research Tools → Select by Location (points intersecting land polygon)
 - [ ] Export selected inland points as CSV
-- [ ] Create `dbt/seeds/seed_excluded_sites.csv` from confirmed inland points
+- [ ] Create `dbt/seeds/manually_excluded_sites.csv` from confirmed inland points
 - [ ] Add seed filter to `mart_offshore_site_prioritization.sql`
 - [ ] Run `dbt seed && dbt build`
 - [ ] Re-verify top 10 sites are all visibly offshore

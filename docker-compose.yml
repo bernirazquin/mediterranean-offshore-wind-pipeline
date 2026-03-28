@@ -7,7 +7,7 @@ volumes:
 services:
   #Kestra internal engine database
   kestra_postgres:
-    image: postgres:17
+    image: postgres:18
     volumes:
       - kestra_db_data:/var/lib/postgresql
     environment:

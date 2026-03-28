@@ -50,7 +50,7 @@ DBT              = $(shell pwd)/.venv/bin/dbt
 .DEFAULT_GOAL := help
 
 .PHONY: all all-test setup infra services wait ingest ingest-test flows \
-        flow-sync flow-keys flow-backfill flow-test flow-mini dbt dbt-test down clean help
+        flow-sync flow-keys flow-backfill flow-test flow-mini truncate-raw dbt dbt-test down clean help
 
 # ── Help ─────────────────────────────────────────────────────
 help:
@@ -66,6 +66,7 @@ help:
 	@echo "  make flow-sync      sync flow YAML files from repo to Kestra"
 	@echo "  make flow-keys      seed KV store + 111 grid coordinates"
 	@echo "  make flow-test      test ingestion for one site (run before backfill)"
+	@echo "  make truncate-raw   truncate raw wind/wave tables (for clean re-runs)"
 	@echo "  make flow-mini      ingest 3 sites x 1 year (test mode)"
 	@echo "  make flow-backfill  full historical ingestion (~2-4 hours)"
 	@echo "  make flows          flow-keys + flow-backfill together"
@@ -82,7 +83,7 @@ all: setup infra services wait flow-sync ingest flows dbt
 	@echo "Pipeline complete."
 
 # ── Full test pipeline (~5-10 min) ───────────────────────────
-all-test: setup infra services wait flow-sync ingest-test flow-mini dbt-test
+all-test: setup infra services wait flow-sync ingest-test truncate-raw flow-mini dbt-test
 	@echo ""
 	@echo "Test pipeline complete."
 	@echo "For full dataset run: make all"
@@ -199,6 +200,19 @@ flow-keys:
 			echo "  ERROR: site_key_values flow failed (state: $$STATE)"; exit 1; fi; \
 		sleep 5; \
 	done
+
+# ── Truncate raw time-series tables (for idempotent re-runs) ─
+truncate-raw:
+	@echo "Truncating raw wind and wave tables for clean re-run..."
+	@$(PYTHON) -c "\
+from google.cloud import bigquery; \
+import os; \
+bq = bigquery.Client.from_service_account_json('keys/google_credentials.json', project='$(GCP_PROJECT_ID)'); \
+[bq.query(f'TRUNCATE TABLE \`$(GCP_PROJECT_ID).med_wind_prod.{t}\`').result() \
+ for t in ('raw_wind_data', 'raw_wave_data') \
+ if any(True for _ in bq.list_tables('$(GCP_PROJECT_ID).med_wind_prod') if _.table_id == t)]; \
+print('  Done.')"
+	@echo "Raw tables cleared."
 
 # ── Test ingestion — 3 sites x 1 year ────────────────────────
 flow-mini:

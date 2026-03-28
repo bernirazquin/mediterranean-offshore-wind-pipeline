@@ -175,11 +175,11 @@ flow-sync:
 flow-keys:
 	@echo "Pushing GCS bucket and project ID to Kestra KV store..."
 	@curl -s -u "$(KESTRA_AUTH)" -X PUT \
-		"$(KESTRA_URL)/api/v1/kvs/$(KESTRA_NAMESPACE)/gcs_bucket" \
+		"$(KESTRA_URL)/api/v1/namespaces/$(KESTRA_NAMESPACE)/kv/gcs_bucket" \
 		-d "$(GCS_BUCKET)" \
 		-H "Content-Type: text/plain" > /dev/null
 	@curl -s -u "$(KESTRA_AUTH)" -X PUT \
-		"$(KESTRA_URL)/api/v1/kvs/$(KESTRA_NAMESPACE)/gcp_project_id" \
+		"$(KESTRA_URL)/api/v1/namespaces/$(KESTRA_NAMESPACE)/kv/gcp_project_id" \
 		-d "$(GCP_PROJECT_ID)" \
 		-H "Content-Type: text/plain" > /dev/null
 	@echo "Seeding 111 grid coordinates into Kestra KV store..."

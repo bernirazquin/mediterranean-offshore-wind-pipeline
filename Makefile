@@ -183,14 +183,22 @@ flow-keys:
 		-d "$(GCP_PROJECT_ID)" \
 		-H "Content-Type: text/plain" > /dev/null
 	@echo "Seeding 111 grid coordinates into Kestra KV store..."
-	@curl -s -u "$(KESTRA_AUTH)" -X POST \
+	@EXEC_ID=$$(curl -s -u "$(KESTRA_AUTH)" -X POST \
 		"$(KESTRA_URL)/api/v1/executions/$(KESTRA_NAMESPACE)/site_key_values" \
 		-H "Content-Type: application/json" \
 		-d '{}' | python3 -c \
-		"import sys,json; r=json.load(sys.stdin); \
-		print('  Execution ID:', r.get('id','unknown'))"
-	@echo "Waiting 60s for key values to populate..."
-	@sleep 60
+		"import sys,json; r=json.load(sys.stdin); print(r.get('id',''))"); \
+	echo "  Execution ID: $$EXEC_ID"; \
+	echo "  Waiting for KV store to be populated..."; \
+	while true; do \
+		STATE=$$(curl -s -u "$(KESTRA_AUTH)" \
+			"$(KESTRA_URL)/api/v1/executions/$$EXEC_ID" | python3 -c \
+			"import sys,json; print(json.load(sys.stdin).get('state',{}).get('current',''))"); \
+		if [ "$$STATE" = "SUCCESS" ]; then echo "  KV store populated."; break; fi; \
+		if [ "$$STATE" = "FAILED" ] || [ "$$STATE" = "KILLED" ]; then \
+			echo "  ERROR: site_key_values flow failed (state: $$STATE)"; exit 1; fi; \
+		sleep 5; \
+	done
 
 # ── Test ingestion — 3 sites x 1 year ────────────────────────
 flow-mini:
@@ -208,19 +216,31 @@ flow-mini:
 		-H "Content-Type: text/plain" \
 		-d '{"lat": 42.5, "lon": 3.5}' > /dev/null
 	@echo "Triggering mini ingestion — 3 sites x 1 year..."
-	@for site in "GULF_OF_LION_43.0_4.0" "GULF_OF_LION_42.75_3.75" "GULF_OF_LION_42.5_3.5"; do \
+	@EXEC_IDS=""; \
+	for site in "GULF_OF_LION_43.0_4.0" "GULF_OF_LION_42.75_3.75" "GULF_OF_LION_42.5_3.5"; do \
 		echo "  Ingesting $$site..."; \
-		curl -s -u "$(KESTRA_AUTH)" -X POST \
+		ID=$$(curl -s -u "$(KESTRA_AUTH)" -X POST \
 			"$(KESTRA_URL)/api/v1/executions/$(KESTRA_NAMESPACE)/site_data_ingestion" \
 			-H "Content-Type: multipart/form-data" \
 			-F "site=$$site" \
 			-F "start_date=2023-01-01" \
 			-F "end_date=2023-12-31" | python3 -c \
-			"import sys,json; r=json.load(sys.stdin); \
-			print('  Execution ID:', r.get('id','unknown'))"; \
+			"import sys,json; print(json.load(sys.stdin).get('id',''))"); \
+		echo "  Execution ID: $$ID"; \
+		EXEC_IDS="$$EXEC_IDS $$ID"; \
+	done; \
+	echo "  Waiting for all 3 ingestions to complete..."; \
+	for ID in $$EXEC_IDS; do \
+		while true; do \
+			STATE=$$(curl -s -u "$(KESTRA_AUTH)" \
+				"$(KESTRA_URL)/api/v1/executions/$$ID" | python3 -c \
+				"import sys,json; print(json.load(sys.stdin).get('state',{}).get('current',''))"); \
+			if [ "$$STATE" = "SUCCESS" ]; then echo "  $$ID — SUCCESS"; break; fi; \
+			if [ "$$STATE" = "FAILED" ] || [ "$$STATE" = "KILLED" ]; then \
+				echo "  ERROR: execution $$ID failed (state: $$STATE)"; exit 1; fi; \
+			sleep 5; \
+		done; \
 	done
-	@echo "Waiting 180s for ingestion to complete..."
-	@sleep 180
 	@echo "Mini ingestion complete."
 
 # ── Test ingestion — 1 site x 1 month ────────────────────────

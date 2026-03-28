@@ -451,7 +451,7 @@ To be completed in QGIS with a high-resolution land mask.
 - [ ] Load Natural Earth 1:10m land polygons: https://www.naturalearthdata.com/downloads/10m-physical-vectors/
 - [ ] Run Vector → Research Tools → Select by Location (points intersecting land polygon)
 - [ ] Export selected inland points as CSV
-- [ ] Create `dbt/seeds/seed_excluded_sites.csv` from confirmed inland points
+- [ ] Create `dbt/seeds/manually_excluded_sites.csv` from confirmed inland points
 - [ ] Add seed filter to `mart_offshore_site_prioritization.sql`
 - [ ] Run `dbt seed && dbt build`
 - [ ] Re-verify top 10 sites are all visibly offshore

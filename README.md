@@ -77,8 +77,9 @@ Natural Earth   ──┘
 | Bathymetry | [ETOPO 2022 (NOAA)](https://www.ncei.noaa.gov/products/etopo-global-relief-model) | NetCDF via OPeNDAP | ~450m resolution · global |
 | Coastline | [Natural Earth 1:10m Physical Vectors](https://www.naturalearthdata.com/downloads/10m-physical-vectors/) | Shapefile | Global coastline |
 
-All data is free and publicly available. No API keys are required. Open-Meteo does not 
-require authentication for historical reanalysis data.
+All data is free and publicly available. Open-Meteo does not require authentication for
+historical reanalysis data. `GEMINI_API_KEY` in `.env.example` is optional — it enables
+Kestra's AI assist feature and has no effect on the pipeline.
 
 ---
 

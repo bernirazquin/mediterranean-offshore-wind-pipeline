@@ -216,8 +216,8 @@ Physical gates applied before ranking:
 
 Turbine classification:
 - `depth_m <= 50` → fixed
-- `50 < depth_m <= 300` → floating
-- `depth_m > 300` → not viable (excluded from ranking)
+- `50 < depth_m <= 1000` → floating
+- `depth_m > 1000` → not viable (excluded from ranking)
 
 ### BigQuery tables
 
@@ -374,12 +374,12 @@ make services
 ```
 Kestra UI → http://localhost:8080 (`admin@wind.com` / `Admin1234!`)
 
-#### 4. Generate grid points
+#### 4. Set up Python environment
 ```bash
 make setup
-export GCP_PROJECT_ID=your-project-id
-python scripts/generate_grid.py
 ```
+
+> `generate_grid.py` is a development utility used to generate `site_key_values.yaml` and `grid_points.json`. It is not needed to reproduce the pipeline — the grid is already encoded in the flow.
 
 #### 5. Load static reference data
 ```bash
@@ -407,11 +407,11 @@ make ingest
 ```bash
 make dbt
 ```
-Expected output: 121/121 nodes passing.
+Expected output: 122/122 nodes passing.
 
 #### 8. View dashboard
 Open the
-[Looker Studio dashboard](YOUR_LOOKER_STUDIO_LINK_HERE)
+[Looker Studio dashboard](https://lookerstudio.google.com/s/ljbPw5trmGA)
 or connect your own Looker Studio instance to
 `mart_offshore_site_prioritization` and `mart_offshore_site_gis`
 in BigQuery.

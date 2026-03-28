@@ -298,13 +298,12 @@ Run all checks after every `dbt build` and before any merge to main.
 ## How to Reproduce
 
 ### Prerequisites
-### Prerequisites
 - Docker & Docker Compose
 - Python 3.11+ with venv
 - Terraform v1.5+ — installed automatically by `make infra` if not found
 - GCP project with a service account key:
   1. Go to GCP Console → IAM → Service Accounts → Create
-  2. Grant roles: `Storage Object Admin`, `BigQuery Data Editor`, `BigQuery Job User`
+  2. Grant roles: `Storage Admin`, `Storage Object Admin`, `BigQuery Data Editor`, `BigQuery Job User`
   3. Create a JSON key and download it
   4. Save it to `keys/google_credentials.json`
   5. Generate the base64 value for `.env`:
@@ -312,23 +311,38 @@ Run all checks after every `dbt build` and before any merge to main.
      base64 -i keys/google_credentials.json | tr -d '\n'
 ```
 
-### Quick start
+### ⚡ Run this first — 5-10 minute smoke test
+
+Before running the full 4-hour pipeline, verify the entire stack works end-to-end with minimal data:
+
+```bash
+cp .env.example .env    # fill in GCP_PROJECT_ID, GCS_BUCKET, GCP_SERVICE_ACCOUNT_B64
+make all-test
+```
+
+This runs the complete pipeline on 3 sites × 1 year and all 122 dbt tests. If this passes, `make all` will work.
+
+### Full pipeline
+
+Once `make all-test` passes, run the full historical ingestion (~2-4 hours):
+
+```bash
+make all
+```
+
+Or step by step:
 ```bash
 cp .env.example .env    # fill in your GCP credentials
 make setup              # Python environment
 make infra              # Terraform — provision GCP resources
 make services           # Docker Compose — start Kestra
 make wait               # wait for Kestra to be healthy
+make flow-sync          # sync flow YAML files to Kestra
 make ingest             # load bathymetry + coastline (~30 min)
 make flow-keys          # seed 111 grid coordinates into Kestra KV store
 make flow-test          # optional: test one site before full backfill
 make flow-backfill      # full historical ingestion (~2-4 hours)
 make dbt                # run all dbt models and tests
-```
-
-Or run everything at once after filling `.env`:
-```bash
-make all
 ```
 
 Type `make` with no arguments to see all available commands.
